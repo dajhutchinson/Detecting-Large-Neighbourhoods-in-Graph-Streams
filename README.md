@@ -2,10 +2,10 @@
 Streaming Frequent Items with Timestamps and Detecting Large Neighbourhoods in Graph Streams
 
 ## Compiling
-`g++ hello.cpp -o hello`
+`g++ read.cpp -o read`
 
 ## Execution
-`hello`
+`read`
 
 ## Data
 Graphs are stored as a stream of edges, in no particular order.
