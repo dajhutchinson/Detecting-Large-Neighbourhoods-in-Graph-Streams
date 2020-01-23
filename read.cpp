@@ -3,14 +3,21 @@
  */
 #include <iostream>
 #include <fstream>
+#include <string>
 
 using namespace std;
+
+struct edge {
+  int fst;
+  int snd;
+};
 
 int main() {
 
   ifstream stream("data/facebook_small.edges"); // File to read from
   string line; // current line being read
   string fst,snd;
+  edge e;
 
   while (getline(stream,line)) { // Read each line
     fst=""; snd=""; // initialise temp variables
@@ -25,7 +32,11 @@ int main() {
         fst+=c;
       }
     }
-    cout<<fst<<" & "<<snd<<endl; // print
+    // Create edge
+    e.fst=stoi(fst);
+    e.snd=stoi(snd);
+
+    cout<<e.fst<<" & "<<e.snd<<endl; // print
   }
 
   return 0;
