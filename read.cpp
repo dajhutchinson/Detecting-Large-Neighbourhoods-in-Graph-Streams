@@ -8,14 +8,15 @@
 
 using namespace std;
 
-/*---------*
- * CLASSES *
- *---------*/
+/*-----------------*
+ * DATA STRUCTURES *
+ *-----------------*/
 
 struct edge { // undirected edge
   int fst;
   int snd;
 };
+
 
 /*------------*
  * SIGNATURES *
