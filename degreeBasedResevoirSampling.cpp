@@ -37,6 +37,8 @@ int main() {
 
   for (vector<int>::iterator i=n.begin(); i!=n.end(); i++) cout<<*i<<endl;
 
+  stream.close();
+
   return 0;
 }
 

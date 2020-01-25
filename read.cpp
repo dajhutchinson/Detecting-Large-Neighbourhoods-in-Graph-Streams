@@ -31,13 +31,14 @@ void parse_edge(string str, edge& e);
 int main() {
   ifstream stream("data/facebook_small.edges"); // File to read from
   string line; // current line being read
-  string fst,snd;
   edge e;
 
   while (getline(stream,line)) { // Read each line
     parse_edge(line,e);
     cout<<e.fst<<" & "<<e.snd<<endl; // print
   }
+
+  stream.close();
 
   return 0;
 }
