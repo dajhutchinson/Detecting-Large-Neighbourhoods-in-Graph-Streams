@@ -32,19 +32,19 @@ void parse_edge(string str, edge& e);
 
 int main() {
   int c=10, d=400, s=2; // c=runs, d/c=d2, s=size
-    ifstream stream("data/facebook.edges");
-    vector<int> n;
-    single_pass_insertion_stream(c,d,s,stream,n); // NB does not tell you whose neighbourhood it is
+  ifstream stream("data/facebook.edges");
+  vector<int> n;
+  single_pass_insertion_stream(c,d,s,stream,n); // NB does not tell you whose neighbourhood it is
 
-    // Print out returned neighbourhood, if one exists
-    if (n.size()==0) {
-      cout<<"NO SUCCESSES"<<endl;
-    } else {
-      for (vector<int>::iterator i=n.begin(); i!=n.end(); i++) cout<<*i<<endl;
-    }
-    stream.close();
-    return 0;
+  // Print out returned neighbourhood, if one exists
+  if (n.size()==0) {
+    cout<<"NO SUCCESSES"<<endl;
+  } else {
+    for (vector<int>::iterator i=n.begin(); i!=n.end(); i++) cout<<*i<<endl;
   }
+  stream.close();
+  return 0;
+}
 
 // perform resevoir sampling
 void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vector<int> &neighbourhood) {

@@ -62,3 +62,20 @@ void parse_edge(string str, edge& e) {
   e.fst=stoi(fst);
   e.snd=stoi(snd);
 }
+
+void parse_insertion_deletion_edge(string str, edge& e) {
+  string fst="",snd="";
+  int count=0;
+  bool insert=NULL; // True for insertion, false for deletion
+
+  for (char& c:str) {
+    if (c==' ')count+=1;
+    else if (count==0 && c=='I') insert=true;
+    else if (count==0 && c=='D') insert=false;
+    else if (count==1) fst+=c;
+    else if (count==2) snd+=c;
+  }
+
+  e.fst=stoi(fst);
+  e.snd=stoi(snd);
+}
