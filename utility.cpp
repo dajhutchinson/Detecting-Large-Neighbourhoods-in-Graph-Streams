@@ -16,8 +16,8 @@ using namespace std;
  *-----------------*/
 
 struct edge { // undirected edge
-  int fst;
-  int snd;
+  string fst;
+  string snd;
 };
 
 
@@ -28,15 +28,22 @@ struct edge { // undirected edge
 void parse_edge(string str, edge& e);
 void generate_insertion_deletion(string file_name);
 void list_vertices(string file_name);
+void merge_files(string* file_names, string output_name);
 
 /*------*
  * BODY *
  *------*/
 
- int main() {
-   list_vertices("data/facebook_small");
-   return 0;
- }
+void merge_files(string* file_names, string output_name) {
+  ofstream outfile(output_name);
+  string line;
+  for (int i=0; i<sizeof(file_names); i++) { // each input file
+    ifstream stream(file_names[i]); // output file
+    while (getline(stream,line)) outfile<<line<<endl; // write lines to end of outputfile
+    stream.close();
+  }
+  outfile.close();
+}
 
 // Takes an insertion only stream & generates an insertion-deletion stream
 void generate_insertion_deletion(string file_name) {
@@ -72,7 +79,7 @@ void list_vertices(string file_name) {
   ofstream outfile(file_name+".vertices");
   ifstream stream(file_name+".edges");
 
-  set<int> vertices; string line; edge e;
+  set<string> vertices; string line; edge e;
 
   while(getline(stream,line)) {
     parse_edge(line,e);
@@ -105,6 +112,6 @@ void parse_edge(string str, edge& e) {
   }
 
   // Update edge values
-  e.fst=stoi(fst);
-  e.snd=stoi(snd);
+  e.fst=fst;
+  e.snd=snd;
 }
