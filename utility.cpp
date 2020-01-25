@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <random>
+#include <set>
 
 using namespace std;
 
@@ -25,13 +26,20 @@ struct edge { // undirected edge
  *------------*/
 
 void parse_edge(string str, edge& e);
+void generate_insertion_deletion(string file_name);
+void list_vertices(string file_name);
 
 /*------*
  * BODY *
  *------*/
 
-int main() {
-  string file_name="data/facebook";
+ int main() {
+   list_vertices("data/facebook_small");
+   return 0;
+ }
+
+// Takes an insertion only stream & generates an insertion-deletion stream
+void generate_insertion_deletion(string file_name) {
   ofstream outfile(file_name+"_deletion.edges");
   ifstream stream(file_name+".edges");
 
@@ -58,6 +66,27 @@ int main() {
 
   stream.close();
   outfile.close();
+}
+
+void list_vertices(string file_name) {
+  ofstream outfile(file_name+".vertices");
+  ifstream stream(file_name+".edges");
+
+  set<int> vertices; string line; edge e;
+
+  while(getline(stream,line)) {
+    parse_edge(line,e);
+
+    if (vertices.find(e.fst)==vertices.end()) {
+      vertices.insert(e.fst);
+      outfile<<e.fst<<endl;
+    }
+
+    if (vertices.find(e.snd)==vertices.end()) {
+      vertices.insert(e.snd);
+      outfile<<e.snd<<endl;
+    }
+  }
 }
 
 // parse ege from stream
