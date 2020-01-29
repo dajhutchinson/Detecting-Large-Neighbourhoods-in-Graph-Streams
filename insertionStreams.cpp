@@ -12,9 +12,11 @@ using namespace std;
  * DATA STRUCTURES *
  *-----------------*/
 
+using vertex = int; // typemap vertex
+
 struct edge { // undirected edge
-  int fst;
-  int snd;
+  vertex fst;
+  vertex snd;
 };
 
 /*-----------*
@@ -22,8 +24,8 @@ struct edge { // undirected edge
 *------------*/
 
 // size = size of resevoir
-void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vector<int> &neighbourhood);
-void update_resevoir(int node, int d1, int d2, int count, int size, vector<int>& resevoir, vector<edge>& edges);
+void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vector<vertex>& neighbourhood, vertex& root);
+void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges);
 void parse_edge(string str, edge& e);
 
 /*-----*
@@ -33,36 +35,39 @@ void parse_edge(string str, edge& e);
 int main() {
   int c=10, d=400, s=2; // c=runs, d/c=d2, s=size
   ifstream stream("data/facebook.edges");
-  vector<int> n;
-  single_pass_insertion_stream(c,d,s,stream,n); // NB does not tell you whose neighbourhood it is
+  vector<vertex> neighbourhood;
+  vertex root;
+  single_pass_insertion_stream(c,d,s,stream,neighbourhood,root); // NB does not tell you whose neighbourhood it is
 
   // Print out returned neighbourhood, if one exists
-  if (n.size()==0) {
+  vertex* p=&root;
+  if (p==nullptr) {
     cout<<"NO SUCCESSES"<<endl;
   } else {
-    for (vector<int>::iterator i=n.begin(); i!=n.end(); i++) cout<<*i<<endl;
+    cout<<"Neighbourhood for <"<<root<<">"<<endl;
+    for (vector<vertex>::iterator i=neighbourhood.begin(); i!=neighbourhood.end(); i++) cout<<*i<<endl;
   }
   stream.close();
   return 0;
 }
 
 // perform resevoir sampling
-void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vector<int> &neighbourhood) {
+void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vector<vertex>& neighbourhood, vertex& root) {
 
   // initalise edge & vector sets for each parallel run
-  vector<int>* resevoirs[c]; vector<edge>* edges[c];
+  vector<vertex>* resevoirs[c]; vector<edge>* edges[c];
   for (int i=0; i<c; i++) {
-    resevoirs[i]=new vector<int>;
+    resevoirs[i]=new vector<vertex>;
     edges[i]=new vector<edge>;
   }
 
-  string line; edge e; map<int,int> degrees; // these are shared for each run
-  int count[c];  // number of nodes >=d1
+  string line; edge e; map<vertex,int> degrees; // these are shared for each run
+  int count[c];  // number of vertexs >=d1
 
   while (getline(stream,line)) { // While stream is not empty
     parse_edge(line,e);
 
-    // increment degrees for each node
+    // increment degrees for each vertex
     if (degrees.count(e.fst)) {
       degrees[e.fst]+=1;
     } else {
@@ -79,15 +84,15 @@ void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vect
       int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
       // NB rest is standard degree-restricted sampling
 
-      // Consider adding first node to the resevoir
+      // Consider adding first vertex to the resevoir
       if (degrees[e.fst]==d1) {
-        count[j]+=1; // increment number of d1 degree nodes
+        count[j]+=1; // increment number of d1 degree vertexs
         update_resevoir(e.fst,d1,d2,count[j],size,*resevoirs[j],*edges[j]); // possibly add value to resevoir
       }
 
-      // Consider adding second node to the resevoir
+      // Consider adding second vertex to the resevoir
       if (degrees[e.snd]==d1) {
-        count[j]+=1; // increment number of d1 degree nodes
+        count[j]+=1; // increment number of d1 degree vertexs
         update_resevoir(e.snd,d1,d2,count[j],size,*resevoirs[j],*edges[j]); // possibly add value to resevoir
       }
 
@@ -102,33 +107,35 @@ void single_pass_insertion_stream(int c, int d, int size, ifstream& stream, vect
   }
 
   // find successful neighbourhoods for each run
-  vector<tuple<int, int> > success; // (run, node_id)
+  vector<tuple<int, vertex> > success; // (run, vertex_id)
   for (int j=0; j<c; j++) { // cheack each run
     int d1=max(1,(j*d)/c), d2=d/c; // calculate required degree bounds
-    for (vector<int>::iterator i=resevoirs[j]->begin(); i!=resevoirs[j]->end(); i++) {
-      if (degrees[*i]>=d1+d2) success.push_back(make_tuple(j,*i)); // record which nodes had sufficient degree in each run
+    for (vector<vertex>::iterator i=resevoirs[j]->begin(); i!=resevoirs[j]->end(); i++) {
+      if (degrees[*i]>=d1+d2) success.push_back(make_tuple(j,*i)); // record which vertexs had sufficient degree in each run
     }
   }
 
   if (success.size()==0) { // No sucessful runs
     neighbourhood.clear();
-    return
+    vertex* p=&root;
+    p=nullptr;
+    return;
   } else { // at least one successful run
-    int x=rand()%success.size(); // randomly choose a successful (run, node_id) pair
-    int node=get<1>(success[x]);
+    int x=rand()%success.size(); // randomly choose a successful (run, vertex_id) pair
+    root=get<1>(success[x]);
     vector<edge>* edge_set=edges[get<0>(success[x])];
     for (vector<edge>::iterator i=edge_set->begin(); i!=edge_set->end(); i++) { // construct neighbourhood to be returned
-      if (i->fst==node) neighbourhood.push_back(i->snd);
-      else if (i->snd==node) neighbourhood.push_back(i->fst);
+      if (i->fst==root) neighbourhood.push_back(i->snd);
+      else if (i->snd==root) neighbourhood.push_back(i->fst);
     }
-    return
+    return;
   }
 
 }
 
-void update_resevoir(int node, int d1, int d2, int count, int size, vector<int>& resevoir, vector<edge>& edges) {
+void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges) {
   if (resevoir.size()<size) { // resevoir is not full
-    resevoir.push_back(node);
+    resevoir.push_back(n);
   } else { // resevoir is full
     default_random_engine generator;
     bernoulli_distribution d((float)size/(float)count);
@@ -136,7 +143,7 @@ void update_resevoir(int node, int d1, int d2, int count, int size, vector<int>&
       int to_delete=rand()%size;
       int to_delete_val=resevoir[to_delete];
       resevoir.erase(resevoir.begin()+to_delete);
-      resevoir.push_back(node);
+      resevoir.push_back(n);
 
       vector<edge>::iterator i=edges.begin();
       while (i!=edges.end()) {
