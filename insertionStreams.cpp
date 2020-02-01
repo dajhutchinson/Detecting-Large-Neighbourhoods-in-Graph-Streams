@@ -1,10 +1,16 @@
-#include <iostream>
+/*-----------------*
+ * TODO
+ * Record time take & space used
+ *-----------------*/
+
+#include <algorithm>
+#include <chrono>
 #include <fstream>
-#include <string>
-#include <vector>
+#include <iostream>
 #include <map>
 #include <random>
-#include <algorithm>
+#include <string>
+#include <vector>
 
 using namespace std;
 
@@ -18,6 +24,8 @@ struct edge { // undirected edge
   vertex fst;
   vertex snd;
 };
+
+typedef chrono::high_resolution_clock::time_point time_point;
 
 /*-----------*
 * SIGNATURES *
@@ -33,21 +41,27 @@ void parse_edge(string str, edge& e);
 *------*/
 
 int main() {
-  int c=10, d=400, s=2; // c=runs, d/c=d2, s=size
-  ifstream stream("data/facebook.edges");
-  vector<vertex> neighbourhood;
-  vertex root;
+  int c=2, d=400, s=2; // c=runs, d/c=d2, s=size
+  ifstream stream("data/facebook.edges"); // file to read
+  vector<vertex> neighbourhood; vertex root; // variables for returned values
+
+  time_point before=chrono::high_resolution_clock::now(); // time before execution
   single_pass_insertion_stream(c,d,s,stream,neighbourhood,root); // NB does not tell you whose neighbourhood it is
+  time_point after=chrono::high_resolution_clock::now(); // time after execution
 
   // Print out returned neighbourhood, if one exists
   vertex* p=&root;
-  if (p==nullptr) {
-    cout<<"NO SUCCESSES"<<endl;
-  } else {
+  if (p==nullptr) cout<<"NO SUCCESSES"<<endl;
+  else {
     cout<<"Neighbourhood for <"<<root<<">"<<endl;
-    for (vector<vertex>::iterator i=neighbourhood.begin(); i!=neighbourhood.end(); i++) cout<<*i<<endl;
+    cout<<"<";
+    for (vector<vertex>::iterator i=neighbourhood.begin(); i!=neighbourhood.end(); i++) cout<<*i<<",";
+    cout<<">"<<endl;
   }
   stream.close();
+
+  auto duration = chrono::duration_cast<chrono::milliseconds>(after-before).count();
+  cout<<duration<<" milliseconds"<<endl;
   return 0;
 }
 
