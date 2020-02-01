@@ -8,6 +8,7 @@
 #include <vector>
 #include <random>
 #include <set>
+#include <map>
 
 using namespace std;
 
@@ -29,10 +30,18 @@ void parse_edge(string str, edge& e);
 void generate_insertion_deletion(string file_name);
 void list_vertices(string file_name);
 void merge_files(string* file_names, string output_name);
+void greatest_degree_insertion_only(string str, string& vertex, int& degree);
 
 /*------*
  * BODY *
  *------*/
+
+ int main() {
+   string greatest; int deg;
+   greatest_degree_insertion_only("data/gplus.edges",greatest,deg);
+   cout<<greatest<<" "<<deg<<endl;
+   return 0;
+ }
 
 void merge_files(string* file_names, string output_name) {
   ofstream outfile(output_name);
@@ -114,4 +123,37 @@ void parse_edge(string str, edge& e) {
   // Update edge values
   e.fst=fst;
   e.snd=snd;
+}
+
+void greatest_degree_insertion_only(string file_name, string& vertex, int& degree) {
+  degree=0; vertex=""; // initalise
+
+  ifstream stream(file_name);
+  map<string,int> degrees; string line; edge e;
+
+  while (getline(stream,line)) {
+    parse_edge(line,e);
+
+    if (degrees.count(e.fst)) {
+      degrees[e.fst]+=1;
+    } else {
+      degrees[e.fst]=1;
+    }
+
+    if (degrees.count(e.snd)) {
+      degrees[e.snd]+=1;
+    } else {
+      degrees[e.snd]=1;
+    }
+  }
+
+
+  for (map<string,int>::iterator i=degrees.begin(); i!=degrees.end(); i++) {
+    if (i->second>degree) {
+      degree=i->second;
+      vertex=i->first;
+    } else if (i->second==degree) {
+      vertex.append(",").append(i->first);
+    }
+  }
 }
