@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <random>
@@ -19,6 +20,7 @@ using namespace std;
 struct edge { // undirected edge
   string fst;
   string snd;
+  bool insertion;
 };
 
 
@@ -30,19 +32,30 @@ void parse_edge(string str, edge& e);
 void generate_insertion_deletion(string file_name);
 void list_vertices(string file_name);
 void merge_files(string* file_names, string output_name);
-void greatest_degree_insertion_only(string str, string& vertex, int& degree);
+void greatest_degree(string str, string& vertex, int& degree);
+void count_edges(string file_name, int& count);
 
 /*------*
  * BODY *
  *------*/
 
- int main() {
-   string greatest; int deg;
-   greatest_degree_insertion_only("data/gplus.edges",greatest,deg);
-   cout<<greatest<<" "<<deg<<endl;
-   return 0;
+int main() {
+  /*
+  generate_insertion_deletion("data/gplus");
+  cout<<"Deletions created"<<endl;
+  string greatest; int deg;
+  greatest_degree("data/gplus_deletion.edges",greatest,deg);
+  cout<<greatest<<" "<<deg<<endl;
+
+  list_vertices("data/gplus_deletion");
+  int count;
+  count_edges("data/gplus_deletion.edges",count);
+  cout<<count<<endl;
+  */
+  return 0;
  }
 
+// merge files into one by appending to the end of each other
 void merge_files(string* file_names, string output_name) {
   ofstream outfile(output_name);
   string line;
@@ -70,12 +83,11 @@ void generate_insertion_deletion(string file_name) {
     parse_edge(line,e);
     edges.push_back(e);
     outfile<<"I "<<e.fst<<" "<<e.snd<<endl;
-    cout<<"I "<<e.fst<<" "<<e.snd<<endl;
+
     while (d(generator) && edges.size()>0) {
       int to_delete=rand()%edges.size();
       edge edge_to_delete=edges[to_delete];
       outfile<<"D "<<edge_to_delete.fst<<" "<<edge_to_delete.snd<<endl;
-      cout<<"D "<<edge_to_delete.fst<<" "<<edge_to_delete.snd<<endl;
       edges.erase(edges.begin()+to_delete);
     }
   }
@@ -107,6 +119,16 @@ void list_vertices(string file_name) {
 
 // parse ege from stream
 void parse_edge(string str, edge& e) {
+  int spaces=count(str.begin(),str.end(),' ');
+
+  if (spaces==2) { // insertion deletion edge
+    if (str[0]=='D') e.insertion=false;
+    else e.insertion=true;
+    str=str.substr(2,str.size());
+  } else if (spaces==1) { // insertion edge
+    e.insertion=true;
+  }
+
   string fst="",snd="";
   bool after=false;
 
@@ -125,7 +147,8 @@ void parse_edge(string str, edge& e) {
   e.snd=snd;
 }
 
-void greatest_degree_insertion_only(string file_name, string& vertex, int& degree) {
+// return list of vertices with greatest degree & the degree
+void greatest_degree(string file_name, string& vertex, int& degree) {
   degree=0; vertex=""; // initalise
 
   ifstream stream(file_name);
@@ -135,18 +158,19 @@ void greatest_degree_insertion_only(string file_name, string& vertex, int& degre
     parse_edge(line,e);
 
     if (degrees.count(e.fst)) {
-      degrees[e.fst]+=1;
+      if (e.insertion) degrees[e.fst]+=1;
+      else degrees[e.fst]-=1;
     } else {
       degrees[e.fst]=1;
     }
 
     if (degrees.count(e.snd)) {
-      degrees[e.snd]+=1;
+      if (e.insertion) degrees[e.snd]+=1;
+      else degrees[e.snd]-=1;
     } else {
       degrees[e.snd]=1;
     }
   }
-
 
   for (map<string,int>::iterator i=degrees.begin(); i!=degrees.end(); i++) {
     if (i->second>degree) {
@@ -155,5 +179,16 @@ void greatest_degree_insertion_only(string file_name, string& vertex, int& degre
     } else if (i->second==degree) {
       vertex.append(",").append(i->first);
     }
+  }
+}
+
+// return number of edges in graph
+void count_edges(string file_name, int& count) {
+  ifstream stream(file_name);
+  string line; count=0; edge e;
+  while (getline(stream,line)) {
+    parse_edge(line,e);
+    if (e.insertion) count+=1;
+    else count-=1;
   }
 }
