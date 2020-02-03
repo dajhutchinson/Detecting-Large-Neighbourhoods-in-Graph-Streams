@@ -10,6 +10,8 @@
 #include <random>
 #include <set>
 #include <map>
+#include <dirent.h>
+#include <sys/types.h>
 
 using namespace std;
 
@@ -17,9 +19,11 @@ using namespace std;
  * DATA STRUCTURES *
  *-----------------*/
 
+using vertex=string;
+
 struct edge { // undirected edge
-  string fst;
-  string snd;
+  vertex fst;
+  vertex snd;
   bool insertion;
 };
 
@@ -34,24 +38,20 @@ void list_vertices(string file_name);
 void merge_files(string* file_names, string output_name);
 void greatest_degree(string str, string& vertex, int& degree);
 void count_edges(string file_name, int& count);
+void merge_directory(const char* path, string output_name);
 
 /*------*
  * BODY *
  *------*/
 
 int main() {
-  /*
-  generate_insertion_deletion("data/gplus");
-  cout<<"Deletions created"<<endl;
+  int count;
+  count_edges("data/gplus_large.edges",count);
+  cout<<count<<endl;
   string greatest; int deg;
-  greatest_degree("data/gplus_deletion.edges",greatest,deg);
+  greatest_degree("data/gplus_large.edges",greatest,deg);
   cout<<greatest<<" "<<deg<<endl;
 
-  list_vertices("data/gplus_deletion");
-  int count;
-  count_edges("data/gplus_deletion.edges",count);
-  cout<<count<<endl;
-  */
   return 0;
  }
 
@@ -65,6 +65,29 @@ void merge_files(string* file_names, string output_name) {
     stream.close();
   }
   outfile.close();
+}
+
+void merge_directory(const char* path, string output_name) {
+  DIR *dir = opendir(path);
+  if (dir == NULL) return; // directory doesnt exist
+
+  ofstream outfile(output_name); dirent *entry;
+  int i=0;
+
+  while ((entry = readdir(dir)) != NULL) { // while there are files in directory
+    string file_name=entry->d_name;
+    if (file_name.size()>5 && file_name.substr(file_name.size()-5)=="edges") { // is an edge file
+      cout<<"STARTING <"<<i<<">-"<<file_name<<endl;
+      string line;
+      ifstream stream(path+file_name); // output file
+      while (getline(stream,line)) outfile<<line<<endl; // write lines to end of outputfile
+      stream.close();
+      cout<<"ENDING-"<<file_name<<endl;
+      i+=1;
+    }
+  }
+  outfile.close();
+  closedir(dir);
 }
 
 // Takes an insertion only stream & generates an insertion-deletion stream
@@ -153,8 +176,11 @@ void greatest_degree(string file_name, string& vertex, int& degree) {
 
   ifstream stream(file_name);
   map<string,int> degrees; string line; edge e;
+  int i=0;
 
   while (getline(stream,line)) {
+    i+=1;
+    if (i%10000==0) cout<<i<<",";
     parse_edge(line,e);
 
     if (degrees.count(e.fst)) {
