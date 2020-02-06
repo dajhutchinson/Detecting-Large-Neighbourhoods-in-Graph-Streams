@@ -1,0 +1,135 @@
+\documentclass[11pt,twoside,a4paper]{report}
+
+\usepackage[ruled, vlined, linesnumbered]{algorithm2e}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{changepage}
+\usepackage{fancyhdr} % Header
+
+\pagenumbering{arabic}
+
+\begin{document}
+
+\renewcommand{\headrulewidth}{0pt}
+\newcommand{\ie}{\textit{i.e.} }
+\newcommand{\nats}{\mathbb{N} }
+\newcommand{\horizontalline}{\newline\vspace{.3cm}\hfill\makebox[.5\linewidth]{\rule{.5\textwidth}{0.4pt}}\hfill\vspace{.1cm}}
+% title
+\title{Implementing \& Evaluating Space Efficient Algoirthms for Detecting Large Neighbourhoods in Graph Streams}
+\author{Dom Hutchinson}
+\date{\today}
+\maketitle
+
+% Header
+\pagestyle{fancy}
+\fancyhead[L]{Dom Hutchinson (1701111)}
+\fancyhead[C]{}
+\fancyhead[R]{\today}
+
+\chapter{Background}
+
+\section{Motivation}
+\par For most algorithms time efficiency is viewed with primary importance, rather than space efficiency. However if the memory used for an algorithm exceeds the size of the computer's RAM then virtual memory would have be used. Virtual memory has a much longer read/write than RAM meaning that the algorithm's run-time will be much greater in this scenario. Thus for algorithms which are designed to work with large data sets space efficiency is more important.
+\par In the early 2000s companies began to realise that data could be used as a commodity, and with this the amount of data being collected has surged in the years since. In this same time period we have nots seen the same surge in the amount of RAM typical computers have. Thus people wishing to capitalise on this increase in available data need to give greather thought to the space efficiency of the algorithms they are using. Otherwise run-times could become unusuable.
+\par Social networks are good sources of data about people. This data can leveraged in many ways, notably within advertising. Behaviourly targeted adverts have been shown to have more than twice the click through rate of standard online advertiesments \cite{targetedAds}. The last decade has seen developments in the space of targeted advertising, one of which is the rise of social media influencers. These are people who are deemed to have a large online following, which they are able to influence. Advertisers will often approach these influencers with deals by which the influencer will promote a product to their audience, hopefully driving sales.
+\par The question becomes, ``Who is an influencer \& how do we find them?''. This question can be generalised as the $\mathtt{Neighborhood\ Detection\ Problem}$. Which is the problem I shall discuss in this paper.
+%TODO
+Although in my description of the Neighbourhood Detection Problem I validate its relevance by referring to find social media influencers, it is applicable to many other scenarios.
+\begin{itemize}
+	\item[-] TODO
+\end{itemize}
+\section{Neighbourhood Detection Problem}
+%TODO Describe Graph streams, insertion-only & insertion-deletion
+\par Graph streams are a dynamic way of representing graphs. They are simply a list of instructions for how to construct a graph and in this paper I shall discuss two types: insertion-only streams \& insertion-deletion streams. There are other types which allow for updating vertex values, among other properties, but they are not relevant to the problem we are considering in this paper.
+\par Insertion-only streams are a list of pairs of vertices, representing endpoints of edges. Each time we read an entry from an insertion-only stream we are adding the edge it describes to the graph. We apply a limitation that no duplicate edegs appear in an insertion-only stream and thus the order of the stream has no affect on the validity of the algorithms which shall be discussed.
+\par Entries in an insertion-deletion list specify a pair of vertices, representing an edge, and a boolean which states whether this is an insertion or deletion entry. If it is an insertion entry then we are adding the described edge to the graph; if it is a deletion entry then we are removing it. Again we add a limitation that no edges are repeated \& that we can not recieve a request to delete an edge from the graph which does not currently exist in the graph. This does however mean that the order of an insertion-deletion is important as the deletion of an edge must come after it.
+\par Despite these limitations it is still possible to construct almost any type of graph from a graph stream. Suppose you wish to analyse which devices in a network are making the most request. Here vertices represent devices \& edges represent requests. In this scenario you would want to allow for multiple edges (say $n>2)$ between the same pair of devices (say $\{x,y\}$). One solution would be to add $n$ new vertices $\{v_{x,y,1},\dots,v_{x,y,n}\}$ each with a label stating they are just indetermiate nodes and not full devices. Creating edges from $x$ to each of $\{v_{x,y,1},\dots,v_{x,y,n}\}$ \& from $y$ to each of $\{v_{x,y,1},\dots,v_{x,y,n}\}$ allows for an interpretation of multiple edges.
+\par If a graph stream is ordered by time (which is common in real life applications) then it represents a dynamic-evolution of the graph over time. Allow the user to roll back the graph should they wish to make assessments during particular time preiods, rather than just assess the final graph.
+\par The algorithms which shall be discussed in this paper are designed to work with just a single pass of a graph stream. This is not only time efficient as it does not require multiple reads of the stream, but means that should more information be gained after the algorithm is run it is easy to incorporate it into algorithm if we store the final state of the data structures used. Single pass algorithms mean we don't necessarily have to store the graph stream, we could simply send entries from the system being modelled straight into the algorithm, without being stored in a file. This is useful when a graph stream potentially could take up multiple terra-bytes, but is unnecessary in most applications.
+\horizontalline
+% Build to problem
+\par The $\mathtt{High\ Degree\ Detection\ Probem}$ is a problem in graph theory where we seek to find a vertex of sufficiently high degree, in a given graph. This node does not necessarily have to have the greatest degree in the graph, and often we cannot be sure whether it does as the greatest degree is unknown beforehand. This problem can be formally stated as
+\vspace{.3cm}\begin{adjustwidth}{.3cm}{}\fbox{\parbox{\textwidth}{
+\textbf{Problem 1} $\texttt{High Degree Detection}$.\\
+Let $G=(A\cup B,E)$ be a bi-partite graph with vertex sets $A,B$, where $|A|=n$ and $|B|=\text{poly }n$ , and edge set $E$. Set a restriction that at least one vertex in $A$ has degree, at least, $d$.\\
+In $\texttt{High Degree Detection Detection}(G,d)$ we are tasked with outputting a vertex from $A$ with degree, at least, $d$.
+}}\end{adjustwidth}\vspace{.3cm}
+\par This problem can be solved efficiently for both insertion-only \& insertion-deletion graph streams with a fairly simple algorithm which simply runs through all the edges, incrementing or decrementing (depending on whether it is an insertion or deletion edge)  a count for the degree of each vertex as it goes. Returning the first vertex it finds with degree equal to $d$.\\
+%TODO Do I have to justify the algorithm
+\begin{algorithm}[H]
+\caption{Single Pass High Degree Detection}
+\SetKwInOut{Require}{require}
+\Require{Stream $\{(i_0,x_0,y_0)\dots(i_n,x_n,y_n)\}$, degree bond $d$}
+$D\leftarrow\{\{\}\}\ \{\text{degree map}\}$\\
+\For{$j\in[0\dots n]$} {
+	\uIf{$x_j\in D$}{
+		\lIf{$i_j$}{$D[x_j]-=1$}
+		\lElse{$D[x_j]+=1$}
+	}
+	\lElse{$D[x_j]=1$}
+	\lIf{$D[x_j]=d$}{\Return{$x_j$}}
+	\textbf{repeat} with $y_j$
+}
+\Return{FAIL}
+\end{algorithm}\vspace{.3cm}
+In \textbf{Algorithm 1} $i$ is a boolean which is true if the edge is an insertion edge, and false if it is a deletion edge. $x\ \&\ y$ are the two endpoints of the edge. The algorithm makes the reasonable assumption that you will never recieve a deletion edge for an edge which is not in the graph, nor shall you recieve the same edge twice.
+\par The $\mathtt{High\ Degree\ Detection\ Probem}$ is limited in its applications as it only returns a vertex with high degree \& gives you no information as to its neighbourhood. Solving this problem would not be very helpful when it comes to choosing influencers as it would only return people who have large followings, but not who their followers are. Thus an advertisier would not be able to evaluate whether their followers represented the audience they wished to market to.
+\par The $\mathtt{Neighbourhood\ Detection\ Problem}$ is an extension of the $\mathtt{High\ Degree}$ $\mathtt{Detection\ Problem}$. The task is to return a vertex with sufficiently high degree \& a certain proportion that vertex's neighbourhood. This is formally stated as
+\vspace{.3cm}\begin{adjustwidth}{.3cm}{}\fbox{\parbox{\textwidth}{
+%TODO Shorten this, make it neater.
+\textbf{Problem 2} $\texttt{Neighbourhood Detection}$.\\
+Let $G=(A\cup B,E)$ be a bi-partite graph with vertex sets $A,B$, where $|A|=n$ and $|B|=\text{poly }n$, and edge set $E$.\\
+In $\texttt{Neighbourhood Detection}(G,d,c)$ we are tasked with outputting a vertex from $A$ and at least $d/c$ of its neighbours in $B$.\\
+Here $d$ is a threshold parameter \& $c$ is an approximation parameter.
+}}\end{adjustwidth}
+\par Solving the $\mathtt{Neighbourhood\ Detection\ Problem}$ allows for a much more general assessment of the influence of the returned vertex. In the context of finding social media influences the returned neighbourhood can be assessed to determine whether the returned person is suitable for a given advertising campaign. When assessing the members of the neighbourhood you could look at the demographics of the members \& how active the members are (among other features) in order to determine whether they fit the target of the campaign. For cases where $c\neq 1$ you only get a fraction of a vertices whole neighbourhood but for sufficiently high $d$ you an implement many statistical tools to still be able to draw meaningful inferences. Later it shall be shown that there are meaningful advantages to increasing the value of $c$.
+
+\section{Why Space Efficiency?}
+Simply solving the $\mathtt{Neighbourhood\ Detection\ Problem}$ is fairly trivial. \textbf{Algorithm 2} is an algorithm for solving the $\mathtt{Neighbourhood\ Detection\ Problem}$ for insertion-only graph streams by recording the vertices in the neighbourhood of every $A$-vertex and then returning the first neighbourhood we enounter with $\frac{d}{c}$ members.\\
+\begin{algorithm}[H]
+\caption{Na\"ive Single-Pass Insertion-Streaming Algorithm for Neighbourhood Detection}
+\SetKwInOut{Require}{require}
+\Require{Stream $\{(s_0,t_0)\dots(s_n,t_n)\}$, degree bound $d$, precision bound $c$}
+$N\leftarrow\{\{\}\}\ \{\text{neighbourhoods}\}$\\
+\For{$i=0\dots n$} {
+	append $t_i$ to $N[s_i]$\\
+	\lIf{\text{size}($N[s_i])\geq \frac{d}{c}$} {
+		\Return{($s_i$,$N[s_i]$)}
+	}
+}
+\Return{FAIL}
+\end{algorithm}
+%TODO check space requirements
+\par\textbf{Algorithm 2} requires $O\left(n^2\right)$ space. Thus the space used to run the algorithm grows very quickly which could easily lead to the computer's RAM overflowing, increasing execution time. This is undesirable, especially given the run time complexity of \textbf{Algorithm 2} is alread bad, $O(n^2)$. % nc/d different vertices with neighbourhoods of d/c-1. Reading to position d/c-1, nc/d times
+For solutions which are space efficient run times become unmanagable for large graph streams. In 2014 in the UK, Facebook had 36.68 million users \cite{users16} each with an average of 155 friend connections \cite{friends16}. In order for this to be represented in a bi-partite graph for $\mathtt{neighbourhood\ detection}$ we would need a graph stream with ${\sim}5.6$ billion edges. \textbf{Algorithm 2} would not be suitable for analysing this graph.
+\par Instead we must look for much more space efficient algorithms for\\
+$\mathtt{neighbourhood\ detection}$. In the rest of this paper I shall discuss \& test an algorithm which can solve $\mathtt{neighbourhood\ detection}$ for insertion-only streams with space $O(n\log n+n^{\frac1c}d\log^2n)$; and, two approaches to solving for $\mathtt{neighbourhood\ detection}$ for insertion-deletion streams with space $\tilde O\left(\frac{xd}{c}\right)\ \&\ \tilde O\left(\frac{nd}{c}\left(\frac1x+\frac1x\right)\right)$ respectively.
+
+\section{Plan}
+In this paper I shall implement and test the two algorithms presented by Dr Chrisian Konrad in \cite{orig}. These algorithms solve the \textit{Neighbourhood Detection Problem} for insertion-only \& insertion-deletion graph streams in a space-efficient manner. Both algorithms require only a single pass of the stream.
+\par I shall use the na\"ive algorithm described in \textbf{Algorithm 2} as a benchmark for both time \& space efficiency of these two algorithms. I shall use a four different graph streams, described in \textbf{Table 1.1}, for my tests. % probs should have more graphs
+These graphs were acquired from the \textit{Stanford Network Analysis Project}, \cite{SNAP}.
+\par The theoretical space requirements for these two algorithms both depend on the degree variable, $d$, and precision variable, $c$. I shall perform tests where I vary each of these in order to see what the space requirements are in practice, and then compare these results to the theory.
+
+\begin{table}[h]
+\caption{Test Graph Streams}
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+Name&\# Edges&\# Vertices&Max Degree&File Size, KB\\\hline
+$\mathtt{facebook\_small}$&292&52&36&3\\
+$\mathtt{facebook}$&60,050&747&586&587\\
+$\mathtt{gplus}$&1,179,613&12,417&5,948&52,839\\
+$\mathtt{gplus\_large}$&30,238,035&120,100&104,947&1,328,820\\\hline
+\end{tabular}
+\label{Tab:Tcr}
+\end{table}
+
+\begin{thebibliography}{9}
+\bibitem{orig} Christian Konrad \textit{Streaming Frequent Items with Timestamps and Detecting Large Neighborhoods in Graph Streams.} November 2019
+\bibitem{targetedAds} Howard Beales \textit{The Value of Behavioral Targeting}.
+\bibitem{users16} https://www.statista.com/statistics/553538/predicted-number-of-facebook-users-in-the-united-kingdom-uk/
+\bibitem{friends16} https://www.telegraph.co.uk/news/science/science-news/12108412/Facebook-users-have-155-friends-but-would-trust-just-four-in-a-crisis.html
+\bibitem{SNAP}http://snap.stanford.edu/data/
+\end{thebibliography}
+
+\end{document}
