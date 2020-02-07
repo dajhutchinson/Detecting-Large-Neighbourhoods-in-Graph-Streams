@@ -45,12 +45,13 @@ void merge_directory(const char* path, string output_name);
  *------*/
 
 int main() {
-  int count;
-  count_edges("data/gplus_large.edges",count);
-  cout<<count<<endl;
+  generate_insertion_deletion("data/gplus_large");
   string greatest; int deg;
   greatest_degree("data/gplus_large.edges",greatest,deg);
-  cout<<greatest<<" "<<deg<<endl;
+  cout<<"Greatest Degree "<<greatest<<" "<<deg<<endl;
+  int count;
+  count_edges("data/gplus_large_deletion.edges",count);
+  cout<<"# Edges "<<count<<endl;
 
   return 0;
  }
@@ -101,8 +102,11 @@ void generate_insertion_deletion(string file_name) {
   float p=0.1; // Probability to delete an edge // VARY THIS
   default_random_engine generator;
   bernoulli_distribution d(p);
+  int i=0;
 
   while (getline(stream,line)) {
+    i+=1;
+    if (i%10000==0) cout<<i<<", ";
     parse_edge(line,e);
     edges.push_back(e);
     outfile<<"I "<<e.fst<<" "<<e.snd<<endl;
@@ -114,7 +118,7 @@ void generate_insertion_deletion(string file_name) {
       edges.erase(edges.begin()+to_delete);
     }
   }
-
+  cout<<endl;
   stream.close();
   outfile.close();
 }
@@ -180,13 +184,14 @@ void greatest_degree(string file_name, string& vertex, int& degree) {
 
   while (getline(stream,line)) {
     i+=1;
-    if (i%10000==0) cout<<i<<",";
+    if (i%100000==0) cout<<i<<",";
     parse_edge(line,e);
 
     if (degrees.count(e.fst)) {
       if (e.insertion) degrees[e.fst]+=1;
       else degrees[e.fst]-=1;
     } else {
+      // You cannot delete an edge which does not exist
       degrees[e.fst]=1;
     }
 

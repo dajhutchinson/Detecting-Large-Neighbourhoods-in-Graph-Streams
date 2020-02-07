@@ -34,7 +34,7 @@ void naive_neighbourhood_detection(int d, ifstream& stream, vector<vertex>& neig
   *------*/
 
 int main() {
-  int d=30;
+  int d=297;
   ifstream stream("data/gplus.edges");
   vector<vertex> neighbourhood; vertex root; // variables for returned values
 
