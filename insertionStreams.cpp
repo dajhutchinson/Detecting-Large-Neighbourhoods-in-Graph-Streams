@@ -1,6 +1,7 @@
 /*-----------------*
  * TODO
- * Record time take & space used
+ * Tests
+ *   - Set parameters & output results to csv
  *-----------------*/
 
 #include <algorithm>
@@ -35,6 +36,7 @@ struct edge { // undirected edge
 *------------*/
 
 // size = size of resevoir
+void execute_test(int c_min, int c_max, int c_step, int d, int n, string file_name, string out_file);
 void single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root);
 void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges);
 void parse_edge(string str, edge& e);
@@ -44,35 +46,37 @@ void parse_edge(string str, edge& e);
 *------*/
 
 int main() {
-  int d=104947, n=120100; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree
-  for (int c=2;c<50;c++) {
-    BYTES=0; MAX_BYTES=0;
-    ifstream stream("data/gplus_large.edges"); // file to read
-    vector<vertex> neighbourhood; vertex root; // variables for returned values
+  int d=586, n=747;
+  execute_test(2,20,1,d,n,"data/facebook.edges","results/facebook_results.csv");
+  d=5948; n=12417;
+  execute_test(2,20,1,d,n,"data/gplus.edges","results/gplus_results.csv");
+  d=104947; n=120100; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
+  execute_test(3,20,1,d,n,"data/gplus_large.edges","results/gplus_large_results.csv");
+  return 0;
+}
+
+// Runs algorithm multiple time, writing results to a csv file
+void execute_test(int c_min, int c_max, int c_step, int d, int n, string file_name, string out_file) {
+  ofstream outfile(out_file);
+  outfile<<"name,"<<file_name<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<endl; // test details
+  outfile<<"c,time (milliseconds),space (bytes),succeed"<<endl; // headers
+  vector<vertex> neighbourhood; vertex root; // variables for returned values
+  for (int c=c_min;c<=c_max;c+=c_step) {
+    cout<<c<<"/"<<c_max<<endl; // output to terminal
+    BYTES=0; MAX_BYTES=0; neighbourhood.clear(); vertex* p=&root; p=nullptr; // reset values
+    ifstream stream(file_name); // file to read
 
     time_point before=chrono::high_resolution_clock::now(); // time before execution
     single_pass_insertion_stream(c,d,n,stream,neighbourhood,root);
     time_point after=chrono::high_resolution_clock::now(); // time after execution
 
-    /*// Print out returned neighbourhood, if one exists
-    vertex* p=&root;
-    if (p==nullptr) cout<<"NO SUCCESSES"<<endl;
-    else {
-      cout<<"Neighbourhood for <"<<root<<">"<<endl;
-      cout<<"<";
-      for (vector<vertex>::iterator i=neighbourhood.begin(); i!=neighbourhood.end(); i++) cout<<*i<<",";
-      cout<<">"<<endl;
-    }*/
-
     stream.close();
-
-    auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count();
-    cout<<"c - "<<c<<" Neighbourhood - "<<neighbourhood.size()<<endl;
-    cout<<"Execution Time - "<<duration<<" microseconds ("<<duration/1000<<" milliseconds)"<<endl;
-    cout<<"Max space - "<<MAX_BYTES<<" bytes ("<<MAX_BYTES/1024<<" kb)"<<endl;
+    auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count(); // time passed
+    outfile<<c<<","<<duration<<","<<MAX_BYTES; // write values to file
+    if (neighbourhood.size()>0) outfile<<",true"<<endl;
+    else outfile<<",fail"<<endl;
   }
-
-  return 0;
+  outfile.close();
 }
 
 // perform resevoir sampling
