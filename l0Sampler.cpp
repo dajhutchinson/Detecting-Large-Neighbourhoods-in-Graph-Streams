@@ -1,11 +1,11 @@
 /*
  *  An l0-sample of a vector, x, is a uniform sample from the non-zero elements of x
  *  NOTE
- *  hash function should be chosen from "k-wise independent family of hash functions,"???
+ *  hash function should be chosen from "k-wise independent family of hash functions,"??? probs log n
  *  Always recovers same index (WHY???) bad hash function
  */
 
-#include <ctime>
+#include <chrono>
 #include <iostream>
 #include <random>
 
@@ -23,21 +23,25 @@ int P=1073741789; // >2^30
    unsigned long m;
  };
 
- /*-----------*
- * SIGNATURES *
- *------------*/
+ /*------------*
+  * SIGNATURES *
+  *------------*/
 
 // hashing
 hash_params generate_hash(int m);
 int hash_function(int key, hash_params ps);
 
 // l0
+int l0_sample(int* aj, int size);
 int* sample(int* a, int size, int j, hash_params ps);
 int recover(int* aj, int size);
 
-/*-----*
-* BODY *
-*------*/
+// utility
+int* copy_arr(int* arr, int size);
+
+/*------*
+ * BODY *
+ *------*/
 
 int main() {
   int a[]={0,0,0,1,0,1,1,0,1,0,0,0,1,0,0,1,1,1,0,0,0,1,0,1,1,0,0,0,1,1,0,1,0,1,1,1,1,0,1,1,0,0,1,1,1,0,0,1,1,0,1,1,0,0,1,0,0,0,1,0,0,0,1,1,
@@ -54,25 +58,10 @@ int main() {
            1,1,1,0,0,1,0,0,1,0,1,1,0,1,0,0,0,1,1,0,0,0,0,0,1,1,0,0,0,1,0,1,1,1,0,1,1,1,1,1,0,0,1,1,1,1,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,1,0}; // 402 1s, 367 0s
   int size=sizeof(a)/sizeof(int);
 
-  hash_params ps=generate_hash(pow(size,3)); // m=n^3 where n is |x|
-  cout<<"{a="<<ps.a<<",b="<<ps.b<<",m="<<ps.m<<"}"<<endl;
-
-  int j=1;
-  while (true) {
-    //cout<<"j="<<j<<endl;
-
-    int* a_j=sample(a,size,j,ps); // sample from vector
-    //for (int i=0; i<20; i++) cout << a_j[i]<<",";
-    //cout<<endl;
-
-    int r=recover(a_j,size); // try to recover an index
-    if (r==-2) { // fail
-      cout<<"FAIL-a_"<<j<<" is zero string"<<endl;
-      break;
-    } else if (r!=-1) { // success
-      cout<<"j="<<j<<",r="<<r<<",a[r]="<<a[r]<<endl;
-      break;
-    } else j+=1;// try again
+  for (int i=0;i<100;i++) {
+    int r=l0_sample(a,size);
+    if (r==-1) cout<<"FAIL"<<endl;
+    else cout<<"r="<<r<<",a[r]="<<a[r]<<endl; // a[r] should = 1
   }
 
   return 0;
@@ -80,7 +69,8 @@ int main() {
 
 // generate parameters to use in hash function
 hash_params generate_hash(int m) {
-  default_random_engine generator{static_cast<long unsigned int>(time(0))};
+  default_random_engine generator;
+  generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
   uniform_int_distribution<unsigned long> distribution(0,P-1);
   hash_params ps={
     distribution(generator),
@@ -93,6 +83,30 @@ hash_params generate_hash(int m) {
 // hash a key
 int hash_function(int key, hash_params ps) {
   return ((ps.a*key+ps.b)%P)%ps.m;
+}
+
+// perform l0-sampling on a
+int l0_sample(int* a, int size) {
+  int j=1;
+  int* a_j=copy_arr(a,size);
+
+  while (true) {
+    //cout<<"j="<<j<<endl;
+    hash_params ps=generate_hash(pow(size,3)); // m=n^3 where n is |x|
+
+    a_j=sample(a_j,size,j,ps); // sample from vector
+    //for (int i=0; i<20; i++) cout << a_j[i]<<",";
+    //cout<<endl;
+
+    int r=recover(a_j,size); // try to recover an index
+    if (r==-2) { // fail
+      return -1;
+    } else if (r!=-1) { // success
+      return r;
+    }
+
+    j+=1; // try again
+  }
 }
 
 // sample from vector a with condition j
@@ -114,8 +128,19 @@ int recover(int* aj, int size) {
       w1+=aj[i];
       w2+=i*aj[i];
   }
-  cout<<"w1="<<w1<<",w2="<<w2<<endl;
+
   if (w1==1) return w2; // 1-sparse
   if (w1==0) return -2; // zero string
   return -1; // not 1-sparse
+}
+
+/*---------*
+ * UTILITY *
+ *---------*/
+
+// create copy of integer array
+ int* copy_arr(int* arr, int size) {
+    int* new_arr=new int[size];
+    for (int i=0; i<size; i++) new_arr[i]=arr[i];
+    return new_arr;
 }
