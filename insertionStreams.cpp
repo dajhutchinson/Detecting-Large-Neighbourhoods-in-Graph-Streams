@@ -49,7 +49,7 @@ void parse_edge(string str, edge& e);
 int main() {
   //int d=586, n=747, reps=10;
   //execute_test(2,20,1,reps,d,n,"data/facebook.edges","results/facebook_results.csv");
-  //d=5948; n=12417;
+  //int d=5948, n=12417, reps=10;
   //execute_test(3,20,1,reps,d,n,"data/gplus.edges","results/gplus_results.csv");
   int d=104947, n=120100, reps=10; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
   execute_test(3,20,1,reps,d,n,"data/gplus_large.edges","results/gplus_large_results.csv");
@@ -60,12 +60,12 @@ int main() {
 void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file) {
   ofstream outfile(out_file);
   outfile<<"name,"<<file_name<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<"repetitions,"<<reps<<endl<<endl; // test details
-  outfile<<"c,time (milliseconds),space (bytes),successes,avg edges checked"<<endl; // headers
+  outfile<<"c,time (milliseconds),space (bytes),mean edges checked,successes"<<endl; // headers
   vector<vertex> neighbourhood; vertex root; // variables for returned values
   vector<int> times, space; // results of each run of c
   int successes; long edges_checked=0;
   for (int c=c_min;c<=c_max;c+=c_step) {
-    successes=0;
+    successes=0; edges_checked=0;
     times.clear(); space.clear(); // reset for new run of c
     for (int i=0;i<reps;i++) {
       cout<<"("<<i<<"/"<<reps<<") "<<c<<"/"<<c_max<<endl; // output to terminal
@@ -84,7 +84,7 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
     }
     int average_duration = accumulate(times.begin(),times.end(),0)/reps;
     int average_space = accumulate(space.begin(),space.end(),0)/reps;
-    outfile<<c<<","<<average_duration<<","<<average_space<<","<<successes<<","<<(int) edges_checked/reps<<endl; // write values to file
+    outfile<<c<<","<<average_duration<<","<<average_space<<","<<(int) edges_checked/reps<<","<<successes<<endl; // write values to file
   }
   outfile.close();
 }
