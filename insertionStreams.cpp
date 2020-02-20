@@ -1,7 +1,8 @@
 /*-----------------*
  * TODO
  * Tests
- *   - Set parameters & output results to csv
+ *   - Return how much of stream was analysed
+ *   - Return split of space between resevoirs & degree map
  *-----------------*/
 
 #include <algorithm>
@@ -37,7 +38,7 @@ struct edge { // undirected edge
 
 // size = size of resevoir
 void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file); // for (int c=c_min;c<=c_max;c+=c_step). Reps is the number of times each c is tested, average is taken.
-void single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root);
+int single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root);
 void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges);
 void parse_edge(string str, edge& e);
 
@@ -59,10 +60,12 @@ int main() {
 void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file) {
   ofstream outfile(out_file);
   outfile<<"name,"<<file_name<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<"repetitions,"<<reps<<endl<<endl; // test details
-  outfile<<"c,time (milliseconds),space (bytes)"<<endl; // headers
+  outfile<<"c,time (milliseconds),space (bytes),successes,avg edges checked"<<endl; // headers
   vector<vertex> neighbourhood; vertex root; // variables for returned values
   vector<int> times, space; // results of each run of c
+  int successes; long edges_checked=0;
   for (int c=c_min;c<=c_max;c+=c_step) {
+    successes=0;
     times.clear(); space.clear(); // reset for new run of c
     for (int i=0;i<reps;i++) {
       cout<<"("<<i<<"/"<<reps<<") "<<c<<"/"<<c_max<<endl; // output to terminal
@@ -70,8 +73,10 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
       ifstream stream(file_name); // file to read
 
       time_point before=chrono::high_resolution_clock::now(); // time before execution
-      single_pass_insertion_stream(c,d,n,stream,neighbourhood,root);
+      edges_checked+=single_pass_insertion_stream(c,d,n,stream,neighbourhood,root);
       time_point after=chrono::high_resolution_clock::now(); // time after execution
+
+      if (neighbourhood.size()!=0) successes+=1;
 
       stream.close();
       auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count(); // time passed
@@ -79,13 +84,14 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
     }
     int average_duration = accumulate(times.begin(),times.end(),0)/reps;
     int average_space = accumulate(space.begin(),space.end(),0)/reps;
-    outfile<<c<<","<<average_duration<<","<<average_space<<endl; // write values to file
+    outfile<<c<<","<<average_duration<<","<<average_space<<","<<successes<<","<<(int) edges_checked/reps<<endl; // write values to file
   }
   outfile.close();
 }
 
 // perform resevoir sampling
-void single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<vertex>& neighbourhood, vertex& root) {
+// returns number of edges which are read
+int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<vertex>& neighbourhood, vertex& root) {
   int size=ceil(log10(n)*pow(n,(double)1/c));
 
   // initalise edge & vector sets for each parallel run
@@ -100,8 +106,10 @@ void single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<
   int count[c];  // counts the number of vertexs >=d1
   BYTES+=sizeof(string)+sizeof(edge)+sizeof(map<vertex,int>)+sizeof(int);
 
+  int edge_count=0;
   while (getline(stream,line)) { // While stream is not empty
     parse_edge(line,e);
+    edge_count+=1;
 
     // increment degrees for each vertex
     if (degrees.count(e.fst)) {
@@ -143,7 +151,8 @@ void single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<
             else if (i->snd==e.fst) neighbourhood.push_back(i->fst);
           }
           BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-          return;
+          root=e.fst;
+          return edge_count;
         }
       } else if (find(resevoirs[j]->begin(),resevoirs[j]->end(),e.snd)!=resevoirs[j]->end()) { // if second endpoint is in resevoir
         if (degrees[e.snd]<=d2+d1) edges[j]->push_back(e);
@@ -153,7 +162,8 @@ void single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<
             else if (i->snd==e.snd) neighbourhood.push_back(i->fst);
           }
           BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-          return;
+          root=e.snd;
+          return edge_count;
         }
       }
     }
@@ -164,8 +174,8 @@ void single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<
   neighbourhood.clear();
   vertex* p=&root;
   p=nullptr;
-  return;
 
+  return edge_count;
 }
 
 void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges) {
@@ -174,10 +184,14 @@ void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<verte
     BYTES+=sizeof(vertex); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
   } else { // resevoir is full
     default_random_engine generator;
-    bernoulli_distribution d((float)size/(float)count);
+    generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
+    bernoulli_distribution bernoulli_d((float)size/(float)count);
     BYTES+=sizeof(default_random_engine)+sizeof(bernoulli_distribution);
-    if (d(generator)) { // if coin flip passes
-      int to_delete=rand()%size;
+    if (bernoulli_d(generator)) { // if coin flip passes
+
+      uniform_int_distribution<unsigned long> uniform_d(0,size-1); // decide which vertex to delete
+      int to_delete=uniform_d(generator);
+
       vertex to_delete_val=resevoir[to_delete];
       BYTES+=2*sizeof(vertex);
       if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
