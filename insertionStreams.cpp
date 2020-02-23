@@ -47,12 +47,12 @@ void parse_edge(string str, edge& e);
 *------*/
 
 int main() {
-  int d=586, n=747, reps=100;
-  execute_test(2,20,1,reps,d,n,"data/facebook.edges","results/facebook_results.csv");
-  //int d=5948, n=12417, reps=10;
-  //execute_test(3,20,1,reps,d,n,"data/gplus.edges","results/gplus_results.csv");
-  //d=104947, n=120100, reps=10; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
-  //execute_test(3,20,1,reps,d,n,"data/gplus_large.edges","results/gplus_large_results.csv");
+  //int d=586, n=747, reps=100;
+  //execute_test(2,20,1,reps,d,n,"data/facebook.edges","results/facebook_results.csv");
+  //int d=5948, n=12417, reps=20;
+  //execute_test(2,2,1,reps,d,n,"data/gplus.edges","results/gplus_results.csv");
+  d=104947, n=102100, reps=10; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
+  execute_test(3,20,1,reps,d,n,"data/gplus_large.edges","results/gplus_large_results.csv");
   return 0;
 }
 
@@ -60,7 +60,7 @@ int main() {
 void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file) {
   ofstream outfile(out_file);
   outfile<<"name,"<<file_name<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<"repetitions,"<<reps<<endl<<endl; // test details
-  outfile<<"c,time (milliseconds),max space (bytes),resevoir space (bytes),degree space (bytes),mean edges checked,successes"<<endl; // headers
+  outfile<<"c,time (microseconds),max space (bytes),resevoir space (bytes),degree space (bytes),mean edges checked,successes"<<endl; // headers
   vector<vertex> neighbourhood; vertex root; // variables for returned values
   vector<int> times, total_space, resevoir_space, degree_space; // results of each run of c
   int successes; long edges_checked=0;
