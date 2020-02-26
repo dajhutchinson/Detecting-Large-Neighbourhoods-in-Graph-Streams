@@ -12,9 +12,9 @@
 using namespace std;
 int P=1073741789; // >2^30
 
- /*-----------------*
-  * DATA STRUCTURES *
-  *-----------------*/
+/*-----------------*
+ * DATA STRUCTURES *
+ *-----------------*/
 
 // parameters for hash function
  struct hash_params {
@@ -23,9 +23,9 @@ int P=1073741789; // >2^30
    unsigned long m;
  };
 
- /*------------*
-  * SIGNATURES *
-  *------------*/
+/*------------*
+ * SIGNATURES *
+ *------------*/
 
 // hashing
 hash_params generate_hash(int m);
