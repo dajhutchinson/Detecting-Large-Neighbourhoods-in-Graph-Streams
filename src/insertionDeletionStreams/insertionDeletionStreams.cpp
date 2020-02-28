@@ -72,14 +72,12 @@ bool* copy_arr(bool* arr, int size);
  *------*/
 
 int main() {
-  string edge_file_path="data/gplus_deletion.edges",vertex_file_path="data/gplus.vertices";
+  string edge_file_path="../../../data/gplus_deletion.edges",vertex_file_path="../../../data/gplus.vertices";
   int n=12417,c=200,d=4998;
   /*
-  string edge_file_path="data/gplus_large_deletion.edges", vertex_file_path="data/gplus.vertices";
+  string edge_file_path="../../../data/gplus_large_deletion.edges", vertex_file_path="../../../data/gplus.vertices";
   int n=102100, c=200, d=10000;
   */
-
-  cout<<"CCCCCCCCCCCCCCCCCCCCCCCCCCCC="<<c<<endl;
   vertex root; set<vertex> neighbourhood;
 
   time_point before=chrono::high_resolution_clock::now(); // time before execution
@@ -98,6 +96,15 @@ int main() {
   cout<<"Duration="<<duration/1000<<"ms"<<endl;
   if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
   cout<<"BYTES="<<BYTES/pow(1024,2)<<"mb, MAX_BYTES="<<MAX_BYTES/pow(1024,2)<<"mb"<<endl;
+
+  /*
+   *  EDGE SAMPLING
+   *  Approaches
+   *   1. Sampling a mix of insertion & deletion edges then reconstructing?
+   *      Seems dody as likely to have incorrect neighbourhood
+   *   2. Find all final edges & sample from these?
+   *      Seems worse than vertex sampling as need to know all edges
+   */
 
   return 0;
 }

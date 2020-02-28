@@ -43,7 +43,7 @@ unsigned long hash_function(unsigned long key, hash_params ps);
  *------*/
 
 int main() {
-  string edge_file_path="data/facebook_deletion.edges";
+  string edge_file_path="..././data/facebook_deletion.edges";
   int n=66643; // number of edges
   int d=522; // max degree
   int c=200; // accuracy
@@ -57,10 +57,10 @@ int main() {
 
   ifstream stream(edge_file_path);
   int i=0; int j=1;
-  string line; unsigned long lim=n/pow(2,j);
+  string line; unsigned long lim=(10*n)/pow(2,j);
   while (getline(stream,line)) { // single pass of stream
     for (int k=0; k<num_samplers; k++) {
-      ps=generate_hash(n);
+      ps=generate_hash(10*n);
       unsigned long h=hash_function(i,ps);
       if (h<=lim) samples[k]->push_back(line);
     }
@@ -71,10 +71,10 @@ int main() {
     vector<string>& sample=*samples[k];
     int j=1;
     while(sample.size()>1) {
-      ps=generate_hash(n);
+      ps=generate_hash(10*n);
       j+=1;
       vector<string> new_sample;
-      lim=n/pow(2,j);
+      lim=(10*n)/pow(2,j);
       for (int i=0; i<sample.size(); i++) {
         int h=hash_function(i,ps);
         if (h<=lim) new_sample.push_back(sample[i]);
