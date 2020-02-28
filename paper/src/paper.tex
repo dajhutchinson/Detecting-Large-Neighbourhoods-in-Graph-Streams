@@ -28,6 +28,8 @@
 \fancyhead[C]{}
 \fancyhead[R]{\today}
 
+\DontPrintSemicolon % Don't print semicolons in algorithm environment
+
 \chapter{Background}
 
 \section{Motivation}
@@ -129,6 +131,87 @@ $\mathtt{gplus\_large}$&30,238,035&120,100&104,947&1,328,820\\\hline
 \end{tabular}
 \label{Tab:Tcr}
 \end{table}
+
+\newpage
+\begin{algorithm}[H]
+\caption{Single $l_0$-Sampler for vector}
+\SetKwInOut{Require}{require}
+\Require{Vector $\textbf{a}=(a_1,\dots,a_n)$}
+$j=1$.\\
+$\textbf{a}_j=\textbf{a}$.\\
+\While{true}{
+	H=new hash function.\\
+	$a_{j+1}=\pmb0$.\\
+	$j=j+1$.\\
+	\tcp{Sampling}
+	\For{$i\in[1,n]$}{
+		$h=H(i)$.\\
+		\lIf{$h\leq\frac{n^3}{2^j}$}{$a_{j+1,i}=a_{j,i}$}
+		\lElse{$a_{j+1,i}=0$}
+	}
+	$\textbf{a}_{j}=\textbf{a}_{j+1}$
+	\;
+	\tcp{Attempt Recover}
+	$w_1:=\sum a_{j,i}$.\\
+	$w_2:=\sum ia_{j,i}$.\\
+	\;
+	\If{$w_2\equiv0$}{\Return$\mathtt{FAIL}$\tcp*{$a_j\equiv\pmb0$}}
+	\If{$w_1\equiv1$}{\Return$w_2$\tcp*{Index of non-zero value}}
+}
+\end{algorithm}
+Hash functions should be k-wise independent and map from $n$ to $n^3$ where $n$ is the number of vertices in the graph (\ie length of vector since it is from a graph matrix).
+
+\begin{algorithm}[H]
+\caption{Single $l_0$-Sampler for a stream}
+\SetKwInOut{Require}{require}
+\Require{Stream $\textbf{s}=\{s_1,\dots,s_n\}$ with $n$ known, Hash Function $H$}
+sampled=\{\}.\\
+\For{$i\in[1,n\}$}{
+$h=H(i)$.\\
+\lIf{$h\leq\frac{n^3}{2^1}$}{sampled.append($s_i$)}
+}
+$j=1$.\\
+\While{sampled.size()$>1$}{
+  $j=j+1$.\\
+  new\_sample=\{\}.\\
+  \For{$i\in[1,\text{sampled.size()}]$}{
+    $h=H(i)$.\tcp*{Consider changing hash function}
+    \lIf{$h\leq\frac{n^3}{2^j}$}{new\_sample.append(sampled[i])}
+  }
+  sampled=new\_sample.
+}
+\lIf{sampled.size()$\equiv1$}{\Return{Success,sampled[0]}}
+\Return{Fail,NULL}
+\end{algorithm}
+
+\begin{algorithm}[h]
+\caption{$m$ Parallel $l_0$-Samplers for a stream}
+\SetKwInOut{Require}{require}
+\Require{Stream $\textbf{s}=\{s_1,\dots,s_n\}$ with $n$ known, Hash Functions $\textbf{H}=\{H_1,\dots,H_m\}$}
+output=\{\}.\\
+sampled=\{\{\}\}.\\
+\For{$i\in[1,n]$}{
+\tcp{Single pass of stream}
+  \For{$j\in[1,m]$}{
+    $h=H_j(i)$.\\
+    \lIf{$h\leq\frac{n^3}{2^1}$}{sampled[j].append($s_i$)}
+  }
+}
+\For{$j\in[1,m]$}{
+  $k=1$.\\
+  \While{sampled[j].size()$>1$}{
+    $k=k+1$.\\
+    new\_sample=\{\}.\\
+    \For{$i\in[1,\text{sampled[j].size()}]$}{
+      $h=H_j(i)$.\tcp*{Consider changing hash function}
+      \lIf{$h\leq\frac{n^3}{2^k}$}{new\_sample[j].append(sampled[i])}
+    }
+    sampled[j]=new\_sample.
+  }
+  \lIf{sampled[j].size()$\equiv1$}{output.append(sampled[j][0])}
+}
+\Return{output}
+\end{algorithm}
 
 \begin{thebibliography}{9}
 \bibitem{orig} Christian Konrad \textit{Streaming Frequent Items with Timestamps and Detecting Large Neighborhoods in Graph Streams.} November 2019
