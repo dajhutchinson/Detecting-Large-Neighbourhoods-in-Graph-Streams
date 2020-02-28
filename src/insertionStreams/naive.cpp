@@ -30,8 +30,9 @@ struct edge { // undirected edge
  * SIGNATURES *
  *------------*/
 
-void update(vertex v1, vertex v2, map<vertex,int>& degrees, map<vertex,set<vertex> >& neighbourhoods);
+void execute_test(int c_min, int c_max, int c_step, int d, string in_file, string out_file);
 int naive(string edge_file_path, int c, int d, vertex& root, set<vertex>& neighbourhood);
+void update(vertex v1, vertex v2, map<vertex,int>& degrees, map<vertex,set<vertex> >& neighbourhoods);
 void parse_edge(string str, edge& e);
 
 /*------*
@@ -41,25 +42,40 @@ void parse_edge(string str, edge& e);
 int main() {
   int d=586; int c=20; // d=max_degree,c=accuracy
   string edge_file_path="../../data/facebook.edges";
+  string output_file_path="../../results/facebook_naive_results.csv";
 
-  vertex root;
-  set<vertex> neighbourhood;
-
-  time_point before=chrono::high_resolution_clock::now();
-  int edge_count=naive(edge_file_path,c,d,root,neighbourhood);
-  time_point after=chrono::high_resolution_clock::now();
-
-  auto duration=chrono::duration_cast<chrono::microseconds>(after-before).count();
-
-  if(edge_count!=-1) {
-    cout<<"root="<<root<<endl<<"# edges checked="<<edge_count<<endl<<"Neighbourhood ("<<neighbourhood.size()<<")"<<endl; // output result
-    cout<<"time="<<duration<<"mus"<<endl<<"space used="<<BYTES/1024<<"mb"<<endl<<"{";
-    for (set<vertex>::iterator it=neighbourhood.begin(); it!=neighbourhood.end(); it++) cout<<*it<<",";
-    cout<<"}"<<endl;
-  }
-
+  execute_test(2,100,1,d,edge_file_path,output_file_path);
 
   return -1;
+}
+
+// deterministic so dont need repetitions
+void execute_test(int c_min, int c_max, int c_step, int d, string in_file, string out_file) {
+  ofstream outfile(out_file);
+  outfile<<"name,"<<in_file<<endl<<"d,"<<d<<endl<<endl<<endl;
+  outfile<<"c,time (microseconds),space (bytes),mean egdes checked"<<endl;
+
+  vertex root; set<vertex> neighbourhood;
+  for (int c=c_min;c<=c_max;c+=c_step) {
+    BYTES=0;
+    vertex* p=&root; p=nullptr;
+    neighbourhood.clear();
+
+    ifstream stream(in_file);
+
+    time_point before=chrono::high_resolution_clock::now();
+    int edge_count=naive(in_file,c,d,root,neighbourhood);
+    time_point after=chrono::high_resolution_clock::now();
+
+    stream.close();
+    auto duration=chrono::duration_cast<chrono::microseconds>(after-before).count();
+    if (edge_count!=-1) {
+      outfile<<c<<","<<duration<<","<<BYTES<<","<<edge_count<<endl;
+    } else {
+      cout<<c<<" FAIL";
+      return;
+    }
+  }
 }
 
 int naive(string edge_file_path, int c, int d, vertex& root, set<vertex>& neighbourhood) {
