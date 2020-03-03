@@ -1,0 +1,67 @@
+\documentclass[11pt,twoside,a4paper]{article}
+
+\usepackage[ruled, vlined, linesnumbered]{algorithm2e}
+\usepackage{algcompatible}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{changepage}
+\usepackage{enumerate}
+\usepackage{enumitem}
+\usepackage{fancyhdr} % Header
+\usepackage[margin=1.4in]{geometry}
+
+\pagenumbering{arabic}
+
+\algblockdefx{FORALLP}{ENDFAP}[1]%
+  {\textbf{for all }#1 \textbf{do in parallel}}%
+  {\textbf{end for}}
+
+\begin{document}
+
+\begin{algorithm}
+\caption{Na\"ive Single-Pass Insertion-Streaming Algorithm for Neighbourhood Detection}
+\SetKwInOut{Require}{require}
+\Require{Stream $\{(s_0,t_0)\dots(s_n,t_n)\}$, degree bound $d$, precision bound $c$}
+$N\leftarrow\{\{\}\}\ \{\text{neighbourhoods}\}$\\
+\For{$i=0\dots n$} {
+	append $t_i$ to $N[s_i]$\\
+	\lIf{\text{size}($N[s_i])= \frac{d}{c}$} {
+		\Return{($s_i$,$N[s_i]$)}
+	}
+}
+\Return{FAIL}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{One-pass $c$-approximation Insertion-Only Streaming Algorithm for $\mathtt{Neighbourhood\ Detection}$}
+\SetKwInOut{Require}{require}
+\Require{Space $s$, degree bound $d$.}
+$s\leftarrow\lceil\ln(n)\cdot n^{\frac1c}\rceil$\\
+\For{$i\in[0,c-1]$\textbf{ in parallel}}{
+	$(a_i,S_i)\leftarrow\text{Deg-Res-Sampling}\left(\max\left\{1,i\cdot\frac{d}{c}\right\},\frac{d}c,s\right)$
+}
+\Return{Uniform random neighbourhood $(a_i,S_i)$ from the successful runs}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{One-pass $c$-approximation Insertion-Deletion Streaming Algorithm for $\mathtt{Neighbourhood\ Detection}$. \text{(Vertex Sampling)}}
+\SetKwInOut{Require}{require}
+\Require{Space $s$, degree bound $d$.}
+Let $x=\max\left\{\frac{n}{c},\sqrt{n}\right\}$\\
+Sample a uniform random subset $A'\subseteq A$ of size $10\ x\ln n$ of vertices.\\
+\For{$a\in A'$}{
+Run $10\frac{d}{c}\ln n$ $l_0$-samplers on the set of edges incident to $a$.
+}
+\Return{Any neghbourhood of size $\frac{d}{c}$ among the stored edges, if there is one.}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{One-pass $c$-approximation Insertion-Deletion Streaming Algorithm for $\mathtt{Neighbourhood\ Detection}$. \text{(Edge Sampling)}}
+\SetKwInOut{Require}{require}
+\Require{Space $s$, degree bound $d$.}
+Let $x=\max\left\{\frac{n}{c},\sqrt{n}\right\}$\\
+Run $20\frac{nd}{c}\left(\frac1x+\frac1c\right)\ln(n)$ $l_0$ samplers on the stream, in parallel. Each producing a uniform random edge.\\
+\Return{Any neghbourhood of size $\frac{d}{c}$ among the stored edges, if there is one.}
+\end{algorithm}
+
+\end{document}
