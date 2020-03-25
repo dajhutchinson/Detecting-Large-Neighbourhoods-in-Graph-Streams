@@ -38,19 +38,21 @@ struct hash_params { // parameters for hash function
   unsigned long m;
 };
 
- /*------------*
-  * SIGNATURES *
-  *------------*/
+/*------------*
+ * SIGNATURES *
+ *------------*/
 
-void parse_edge(string str, edge& e);
 int one_sparse_recovery(string edge_file, vertex target, int num_vertices);
-int identify_endpoint(edge e,vertex target);
 bool verify_1_sparse(int phi,int iota,int tau);
 void update_counters(int index,int delta,int j,int* phi_s,int* iota_s,int* tau_s);
 
-// hashing
+// Hashing
 hash_params generate_hash(int m);
 int hash_function(int key, hash_params ps);
+
+// Utility
+void parse_edge(string str, edge& e);
+int identify_endpoint(edge e,vertex target);
 
 /*------*
  * BODY *
