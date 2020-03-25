@@ -1,3 +1,13 @@
+/*
+ *  Implementation of exact s-sparse recovery algorithm defined in 2.3.2 of
+ *    A unifying framework for l0-sampling algorithms.
+ *
+ *  This recovers at most s of the non-zero elements of a vector (Very rarely it will return more)
+ *
+ *  This implementation is for recovering part of the neighbourhood to the to a specified vertex
+ *    when edges are defined in a stream.
+ */
+
 #include <algorithm>
 #include <chrono>
 #include <iostream>
