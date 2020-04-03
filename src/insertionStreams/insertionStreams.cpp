@@ -42,18 +42,43 @@ int single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<ve
 void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges);
 void parse_edge(string str, edge& e);
 
+void display_results(int c, int d, int n, string file_name);
+
 /*-----*
 * BODY *
 *------*/
 
 int main() {
-  //int d=586, n=747, reps=100;
-  //execute_test(2,20,1,reps,d,n,"../../data/facebook.edges","results/facebook_results.csv");
-  //int d=5948, n=12417, reps=20;
-  //execute_test(2,2,1,reps,d,n,"../../data/gplus.edges","results/gplus_results.csv");
+  //int d=586, n=747, reps=100; int c=3;
+  //display_results(c,d,n,"../../data/facebook.edges");
+  //execute_test(2,100,1,reps,d,n,"../../data/facebook.edges","../../results/facebook_results.csv");
+  int d=5948, n=12417, reps=20; int c=3; // NOTE - # edges=1,179,613
+  display_results(c,d,n,"../../data/gplus.edges");
+  //execute_test(21,100,1,reps,d,n,"../../data/gplus.edges","../../results/gplus_results.csv");
   //int d=104947, n=102100, reps=10; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
-  //execute_test(9,17,8,reps,d,n,"../../data/gplus_large.edges","results/gplus_large_results.csv");
+  //execute_test(9,17,8,reps,d,n,"../../data/gplus_large.edges","../../results/gplus_large_results.csv");
   return 0;
+}
+
+void display_results(int c, int d, int n, string file_name) {
+  vector<vertex> neighbourhood; vertex root; // variables for returned values
+  ifstream stream(file_name);
+  BYTES=0; RESEVOIR_BYTES=0; DEGREE_BYTES=0; MAX_BYTES=0; MAX_RESEVOIR_BYTES=0;
+
+  time_point before=chrono::high_resolution_clock::now(); // time before execution
+  int edges_checked=single_pass_insertion_stream(c,d,n,stream,neighbourhood,root);
+  time_point after=chrono::high_resolution_clock::now(); // time after execution
+
+  cout<<"Root Node - "<<root<<endl;
+  cout<<"Neighbourhood Size - "<<neighbourhood.size()<<endl;
+  cout<<"# edges checked - "<<edges_checked<<endl;
+  cout<<"Time - "<<chrono::duration_cast<chrono::seconds>(after-before).count()<<" seconds"<<endl;
+
+  if (RESEVOIR_BYTES>MAX_RESEVOIR_BYTES) MAX_RESEVOIR_BYTES=RESEVOIR_BYTES;
+
+  cout<<"MAX RESEVOIR - "<<(float)MAX_RESEVOIR_BYTES/1048576<<" mb"<<endl;
+  cout<<"MAX DEGREE - "<<(float)DEGREE_BYTES/1048576<<" mb"<<endl;
+  //for (vector<vertex>::iterator i=neighbourhood.begin(); i!=neighbourhood.end(); i++) cout<<*i<<",";
 }
 
 // Runs algorithm multiple time, writing results to a csv file

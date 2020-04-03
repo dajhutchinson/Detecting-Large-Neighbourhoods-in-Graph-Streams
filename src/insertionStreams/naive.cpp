@@ -40,9 +40,9 @@ void parse_edge(string str, edge& e);
  *------*/
 
 int main() {
-  int d=586; int c=20; // d=max_degree,c=accuracy
-  string edge_file_path="../../data/facebook.edges";
-  string output_file_path="../../results/facebook_naive_results.csv";
+  int d=5948; int c=20; // d=max_degree,c=accuracy
+  string edge_file_path="../../data/gplus.edges";
+  string output_file_path="../../results/gplus_naive_results.csv";
 
   execute_test(2,100,1,d,edge_file_path,output_file_path);
 
@@ -57,6 +57,7 @@ void execute_test(int c_min, int c_max, int c_step, int d, string in_file, strin
 
   vertex root; set<vertex> neighbourhood;
   for (int c=c_min;c<=c_max;c+=c_step) {
+    cout<<c<<endl;
     BYTES=0;
     vertex* p=&root; p=nullptr;
     neighbourhood.clear();
