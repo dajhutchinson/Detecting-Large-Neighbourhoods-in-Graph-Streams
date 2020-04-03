@@ -123,24 +123,38 @@ void generate_insertion_deletion(string file_name) {
   outfile.close();
 }
 
+// produces list of vertices & their degree
+// works for insetion & insertion-deletion streams
 void list_vertices(string file_name) {
-  ofstream outfile(file_name+".vertices");
   ifstream stream(file_name+".edges");
+  ofstream outfile(file_name+".vertices");
 
-  set<string> vertices; string line; edge e;
+  map<string,int> degrees; string line; edge e;
+  int i=0;
 
-  while(getline(stream,line)) {
+  while (getline(stream,line)) {
+    i+=1;
+    if (i%100000==0) cout<<i<<","; // update on how many edges have been checked
     parse_edge(line,e);
 
-    if (vertices.find(e.fst)==vertices.end()) {
-      vertices.insert(e.fst);
-      outfile<<e.fst<<endl;
+    if (degrees.count(e.fst)) { // vertex already in graph
+      if (e.insertion) degrees[e.fst]+=1; // insertion edge
+      else degrees[e.fst]-=1; // deletion edge
+    } else { // vertex not in graph
+      degrees[e.fst]=1; // cannot delete an edge which is not in the graph
     }
 
-    if (vertices.find(e.snd)==vertices.end()) {
-      vertices.insert(e.snd);
-      outfile<<e.snd<<endl;
+    if (degrees.count(e.snd)) { // vertex already in graph
+      if (e.insertion) degrees[e.snd]+=1; // insertion edge
+      else degrees[e.snd]-=1; // deletion edge
+    } else { // vertex not in graph
+      degrees[e.snd]=1; // cannot delete an edge which is not in the graph
     }
+  }
+
+  // write to vertices file
+  for (map<string,int>::iterator i=degrees.begin(); i!=degrees.end(); i++) {
+    outfile<<i->first<<","<<i->second<<endl; // name,degree
   }
 }
 
