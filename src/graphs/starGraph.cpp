@@ -1,12 +1,12 @@
 /*-----------------*
- * Creates a graph stream for a star graph with a given number of nodes
+ * Creates an insertion graph stream for a star graph with a given number of nodes
  *
  * Star graphs have one node which is connected to every other node (the other nodes are only conneted to this node)
  * In a Star Graph of order N, one node has degree N-1 and the remaining 1 have degree 1.
  *
  * Creates
- *    _.edges = Insertion edge stream
- *    _.vertices = list of vertices and their degrees
+ *    _.edges = Insertion edge stream (formatted as "v1 v2")
+ *    _.vertices = list of vertices and their degrees (formatted as CSV file)
  *-----------------*/
 
 #include <algorithm>
@@ -45,9 +45,9 @@ int main(int argc, char* argv[]) {
     for (int v=1; v<N+1; v++) {
       if (v!=centre) {
         edge_file<<centre<<" "<<v<<endl;
-        vertex_file<<v<<" 1"<<endl;
+        vertex_file<<v<<",1"<<endl;
       } else { // no edge
-        vertex_file<<v<<" "<<N-1<<endl;
+        vertex_file<<v<<","<<N-1<<endl;
       }
     }
 
@@ -55,5 +55,5 @@ int main(int argc, char* argv[]) {
     vertex_file.close();
 
   }
-  return -1;
+  return 0;
 }
