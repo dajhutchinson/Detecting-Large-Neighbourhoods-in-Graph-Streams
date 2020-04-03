@@ -58,14 +58,14 @@
  	\noindent
 	Graph Streams are a sequence of instructions which describe how to construct a graph. Each instruction provides details about an edge in the graph. Graph Streams come in two forms
 	\begin{itemize}
-		\item Instructions in an \textit{Insertion-Only Streams} only ever insert new edges into the graph.
-		\item Instructions in an \textit{Insertion-Deletion Streams} either insert a new edge, or remove an existing edge, from the graph.
+		\item \textit{Insertion-Only Streams} only ever insert new edges into the graph with each instruction.
+		\item \textit{Insertion-Deletion Streams} either insert a new edge, or remove an existing edge, from the graph with each instruction.
 	\end{itemize}
 	In the $\mathtt{Neighbourhood\ Detection\ Problem}(n,d)$ we are given a graph with $n$ vertices \& at least one vertex of degree $d$. We are tasked to return a vertex with at least $\frac{d}c$ of its neighbours, from some approximation factor $c\geq1$.\\
 	\noindent
 	There are some good motivativing applications of the $\mathtt{Neighbourhood\ Detection\ Problem}$.
 	\begin{itemize}
-		\item Given a network of social media connections detect popular influencers and analyse the demographics they attract in order to plan targetted advertising campaigns.
+		\item Given a network of social media accounts, detect popular influencers and analyse the demographics they attract in order to plan targetted advertising campaigns.
 		\item Given a log of traffic to a network detect whether a DDOS attack has occurred and, if so, by whom.
 		\item Given a list of sales made on a website detect which items are most popular and which items they are commonly bought with.
 	\end{itemize}
