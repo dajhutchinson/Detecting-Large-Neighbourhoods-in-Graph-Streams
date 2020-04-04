@@ -59,6 +59,10 @@ void parse_edge(string str, edge& e);
 int identify_endpoint(edge e,vertex target);
 long** initalise_zero_2d_array(int num_cols, int num_rows);
 
+/*------*
+ * BODY *
+ *------*/
+
 int main() {
   int s=100; // sparsity to recover
   double delta=.1; // acceptable failure
@@ -77,8 +81,8 @@ int main() {
  *-------------------*/
 
 set<vertex> s_sparse_recovery(string edge_file, vertex target, int num_vertices, int s, double delta) {
-  int num_rows=log(s/delta);
   int num_cols=2*s;
+  int num_rows=log(s/delta);
 
   // arrays for 1-sparse recovery
   long** phi_s =initalise_zero_2d_array(num_cols,num_rows); // sum of weights (sum ai)
