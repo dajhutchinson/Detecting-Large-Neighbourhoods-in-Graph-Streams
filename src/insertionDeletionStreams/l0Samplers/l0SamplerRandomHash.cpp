@@ -47,6 +47,12 @@ struct hash_params { // parameters for hash function
  * SIGNATURES *
  *------------*/
 
+// s-sparse
+hash_params* choose_hash_functions(int num_cols, int num_rows);
+void update_s_sparse(vertex endpoint, int edge_value, int num_rows, hash_params* ps_s, long** phi_s, long** iota_s, long** tau_s);
+set<vertex> recover_neighbourhood(int num_cols, int num_rows, long** phi_s, long** iota_s, long** tau_s);
+vertex recover_vertex(set<vertex> neighbourhood, int sparsity, map<int,int> hash_map);
+
 // 1-sparse
 bool verify_1_sparse(int phi,int iota,int tau);
 void update_1_sparse_counters(int index,int delta,int row,int col,long** phi_s,long** iota_s,long** tau_s);
@@ -88,39 +94,28 @@ int main() {
   map<vertex,int> edge_count;
 
   int succ_count=0;
-  int num_runs=100000;
+  int num_runs=1000;
   for (int run=0; run<num_runs; run++) {
     map<int,int> unique_hash_map;
     generate_random_hash(num_vertices,pow(num_vertices,3),unique_hash_map);
-    //cout<<run<<","<<"HASH FUNCTION CHOSEN"<<endl;
 
     /** Prepare j s-sparse recoveries **/
     int num_cols=2*s;
     int num_rows=log(s/gamma);
-    //cout<<run<<","<<"NUMBER COLS & ROWS DECIDED ("<<num_cols<<"x"<<num_rows<<")"<<endl;
 
     // arrays for 1-sparse recovery
     long*** phi_s =initalise_zero_3d_array(j,num_cols,num_rows); // sum of weights (sum ai)
     long*** iota_s=initalise_zero_3d_array(j,num_cols,num_rows); // weighted sum of weights (sum ai*i)
     long*** tau_s =initalise_zero_3d_array(j,num_cols,num_rows); // squared weighted sum of weights (sum ai*(i**2))
-    //cout<<run<<","<<"3D ARRAYS PREPARED"<<endl;
-
-    //cout<<run<<","<<"NUM 1-SPARSE SAMPLERS "<<j*num_cols*num_rows<<endl;
 
     // choose hash function for each row
     hash_params** ps_s=initalise_2d_hash_params_array(j,num_rows); // each col is for one s-sparse recovery
-    for (int i=0; i<j; i++) {
-      for (int j=0; j<num_rows; j++) {
-        ps_s[i][j]=generate_hash(num_cols);
-      }
-    }
-    //cout<<run<<","<<"HASH FUNCTIONS CHOSEN"<<endl;
+    for (int i=0; i<j; i++) ps_s[i]=choose_hash_functions(num_cols,num_rows);
 
     // hash limits for each value of j
     int* hash_lims=new int[j];
     int n3=pow(num_vertices,3);
     for (int i=1; i<=j; i++) hash_lims[i]=n3/pow(2,i);
-    //cout<<run<<","<<"HASH LIMITS FOUND"<<endl;
 
     // Process stream
     string line; edge e; int v;
@@ -135,67 +130,25 @@ int main() {
       if (v!=-1) { // edge is connected to target vertex
         sparsity_estimate+=e.value; // increment/decrement depending upon insertion or deletion edge
         for (int i=0; i<j; i++) { // for each s-sparse recovery
-          //int h=hash_function(v,ps); // calculate hash_value
           int h=unique_hash_map[v];
-          if (h<=hash_lims[i]) { // update ith s-sparse recovery
-            //cout<<run<<",PREPARING TO UPDATE"<<i<<"/"<<j<<endl;
-            for (int r=0; r<num_rows; r++) { // decide which sampler in each row to update
-              int c=hash_function(v,ps_s[i][r]); // col to update // TODO change this
-              update_1_sparse_counters(v,e.value,r,c,phi_s[i],iota_s[i],tau_s[i]);
-            }
-            //cout<<run<<",UPDATED"<<i<<"/"<<j<<endl;
-          }
-        }
-      }
+          if (h<=hash_lims[i]) update_s_sparse(v,e.value,num_rows,ps_s[i],phi_s[i],iota_s[i],tau_s[i]);
+      }}
     }
-    //cout<<run<<","<<"STEAM PROCESSED"<<endl;
 
     // Gather sample from j_sample^th s-sparse recovery
-    set<vertex> sampled_neighbourhood;
-
-    //cout<<run<<","<<"SPARSITY ESTIMATE "<<sparsity_estimate<<endl;
     int j_sample=log2(sparsity_estimate)-1; // -1 since 0 indexed
-    //cout<<"j_sample "<<j_sample<<" ("<<num_cols*num_rows<<")"<<endl;
+    set<vertex> sampled_neighbourhood=recover_neighbourhood(num_cols,num_rows,phi_s[j_sample],iota_s[j_sample],tau_s[j_sample]);
+    vertex sampled_vertex=recover_vertex(sampled_neighbourhood,s,unique_hash_map);
 
-    for (int c=0; c<num_cols; c++) {
-      for (int r=0; r<num_rows; r++) {
-        if (verify_1_sparse(phi_s[j_sample][c][r],iota_s[j_sample][c][r],tau_s[j_sample][c][r])) {
-          sampled_neighbourhood.insert(iota_s[j_sample][c][r]/phi_s[j_sample][c][r]);
-    }}}
-
-    // NOTE the official algorithm is to only check the j_sample^th estimator but that has a low success rate
-    // so instead I am do it for the first to succeed
-    /*int i=0;
-    while (sampled_neighbourhood.size()==0 && i<j) {
-      for (int c=0; c<num_cols; c++) {
-        for (int r=0; r<num_rows; r++) {
-          if (verify_1_sparse(phi_s[i][c][r],iota_s[i][c][r],tau_s[i][c][r])) {
-            sampled_neighbourhood.insert(iota_s[i][c][r]/phi_s[i][c][r]);
-      }}}
-      i++;
-    }*/
-
-    //cout<<run<<","<<"NEIGHBOURHOOD SIZE "<<sampled_neighbourhood.size()<<endl;
-
-
-    if (sampled_neighbourhood.size()>s || sampled_neighbourhood.size()==0) {
-      cout<<run<<","<<"FAIL"<<endl;
-    } else {
-      int min_hash=pow(num_vertices,3), min_val=-1;
-      for (set<vertex>::iterator it=sampled_neighbourhood.begin(); it!=sampled_neighbourhood.end(); it++) {
-        int h_i=unique_hash_map[*it];
-        if (h_i<min_hash) {
-          min_hash=h_i;
-          min_val=*it;
-        }
-      }
-      cout<<run<<","<<"SUCCESS ("<<min_val<<")"<<endl;
-
-      if (edge_count.count(min_val)) edge_count[min_val]+=1; // update number of sample occurences
-      else edge_count[min_val]=1;
-
+    // output & update results
+    if (sampled_vertex==-1) cout<<run<<",FAIL"<<endl; // recover failed
+    else { // recovery succeed
+      cout<<run<<",SUCCESS("<<sampled_vertex<<")"<<endl;
       succ_count+=1;
+      if (edge_count.count(sampled_vertex)) edge_count[sampled_vertex]+=1; // update number of sample occurences
+      else edge_count[sampled_vertex]=1;
     }
+
     free_3d_long_array(phi_s,j,num_cols,num_rows);
     free_3d_long_array(iota_s,j,num_cols,num_rows);
     free_3d_long_array(tau_s,j,num_cols,num_rows);
@@ -206,8 +159,58 @@ int main() {
   write_to_file("uniform_sample_test.csv", edge_count);
 }
 
+/*-------------*
+ * L0 Sampling *
+ *-------------*/
+
 /*-------------------*
- * 1 SPARSE RECOVERY *
+ * s-SPARSE RECOVERY *
+ *-------------------*/
+
+// choose hash function for each row of s-sparse recovery
+hash_params* choose_hash_functions(int num_cols, int num_rows) {
+  hash_params* ps_s=new hash_params[num_rows];
+  for (int i=0; i<num_rows; i++) ps_s[i]=generate_hash(num_cols);
+  return ps_s;
+}
+
+// update 1-sparse counters of the s-sparse recovery
+void update_s_sparse(vertex endpoint, int edge_value, int num_rows, hash_params* ps_s, long** phi_s, long** iota_s, long** tau_s) {
+  for (int r=0; r<num_rows; r++) { // decide which sampler in each row to update
+    int c=hash_function(endpoint,ps_s[r]); // col to update
+    update_1_sparse_counters(endpoint,edge_value,r,c,phi_s,iota_s,tau_s);
+  }
+}
+
+// recover neighbourhood from s-sparse recovery counters
+set<vertex> recover_neighbourhood(int num_cols, int num_rows, long** phi_s, long** iota_s, long** tau_s) {
+  set<vertex> neighbourhood;
+  for (int c=0; c<num_cols; c++) {
+    for (int r=0; r<num_rows; r++) {
+      if (verify_1_sparse(phi_s[c][r],iota_s[c][r],tau_s[c][r])) {
+        neighbourhood.insert(iota_s[c][r]/phi_s[c][r]);
+  }}}
+  return neighbourhood;
+}
+
+// recover vertex from recovered neighbourhood
+vertex recover_vertex(set<vertex> neighbourhood, int sparsity, map<int,int> hash_map) {
+  if (neighbourhood.size()>sparsity || neighbourhood.size()==0) return -1; // s-sparse recovery failed
+  else { // return vertex in neighbourhood with min hash value
+    int min_hash=INT_MAX, min_val=-1;
+    for (set<vertex>::iterator it=neighbourhood.begin(); it!=neighbourhood.end(); it++) {
+      int h_i=hash_map[*it];
+      if (h_i<min_hash) { // lowest yet
+        min_hash=h_i;
+        min_val=*it;
+      }
+    }
+    return min_val;
+  }
+}
+
+/*-------------------*
+ * 1-SPARSE RECOVERY *
  *-------------------*/
 
 // update counters with new edge
