@@ -1,5 +1,5 @@
 /*
- *  TEST DESCRIPTIOn
+ *  TEST DESCRIPTION
  *    In this implementation the hash function assigns values uniformly at random to a unique value.
  *    This is inefficient as it has to store where every value goes but it does mean that it is k-wise independent.
  *    This is to test whether using a pairwise independent hash function was the problem.
@@ -10,8 +10,6 @@
  *  An implementation of an L0-Sampler for a specified vertex in a graph stream.
  *    This samples uniformly from the neighbourhood of the vertex.
  *    Edges are provided as a stream of inputs
- *  TODO
-      - Appears to fail randomly after some runs?? Investigate
  */
 
 #include <algorithm>
@@ -53,7 +51,6 @@ struct hash_params { // parameters for hash function
 bool verify_1_sparse(int phi,int iota,int tau);
 void update_1_sparse_counters(int index,int delta,int row,int col,long** phi_s,long** iota_s,long** tau_s);
 
-
 // Hashing
 hash_params generate_hash(int m);
 int hash_function(int key, hash_params ps);
@@ -67,6 +64,7 @@ long*** initalise_zero_3d_array(int depth, int num_cols, int num_rows);
 hash_params** initalise_2d_hash_params_array(int num_cols, int num_rows);
 void free_3d_long_array(long*** arr, int depth, int num_cols, int num_rows);
 void free_2d_hash_params_array(hash_params** arr, int num_cols, int num_rows);
+void write_to_file(string outfile_path, map<vertex,int>& edge_count);
 
 /*------*
  * BODY *
@@ -90,12 +88,10 @@ int main() {
   map<vertex,int> edge_count;
 
   int succ_count=0;
-  int num_runs=10000;
+  int num_runs=100000;
   for (int run=0; run<num_runs; run++) {
     map<int,int> unique_hash_map;
     generate_random_hash(num_vertices,pow(num_vertices,3),unique_hash_map);
-    cout<<"Unique hash map generated"<<endl;
-    hash_params ps=generate_hash(pow(num_vertices,3));
     //cout<<run<<","<<"HASH FUNCTION CHOSEN"<<endl;
 
     /** Prepare j s-sparse recoveries **/
@@ -150,7 +146,8 @@ int main() {
             //cout<<run<<",UPDATED"<<i<<"/"<<j<<endl;
           }
         }
-    }}
+      }
+    }
     //cout<<run<<","<<"STEAM PROCESSED"<<endl;
 
     // Gather sample from j_sample^th s-sparse recovery
@@ -184,19 +181,18 @@ int main() {
     if (sampled_neighbourhood.size()>s || sampled_neighbourhood.size()==0) {
       cout<<run<<","<<"FAIL"<<endl;
     } else {
-      int min_i_hash=pow(num_vertices,3), min_i=-1;
-      for (int i=0; i<sampled_neighbourhood.size(); i++) {
-        int h_i=hash_function(i,ps);
-        if (h_i<min_i_hash) {
-          min_i_hash=h_i;
-          min_i=i;
+      int min_hash=pow(num_vertices,3), min_val=-1;
+      for (set<vertex>::iterator it=sampled_neighbourhood.begin(); it!=sampled_neighbourhood.end(); it++) {
+        int h_i=unique_hash_map[*it];
+        if (h_i<min_hash) {
+          min_hash=h_i;
+          min_val=*it;
         }
       }
-      int sampled_edge=*next(sampled_neighbourhood.begin(),min_i);
-      cout<<run<<","<<"SUCCESS ("<<min_i<<","<<sampled_edge<<")"<<endl;
+      cout<<run<<","<<"SUCCESS ("<<min_val<<")"<<endl;
 
-      if (edge_count.count(sampled_edge)) edge_count[sampled_edge]+=1; // update number of sample occurences
-      else edge_count[sampled_edge]=1;
+      if (edge_count.count(min_val)) edge_count[min_val]+=1; // update number of sample occurences
+      else edge_count[min_val]=1;
 
       succ_count+=1;
     }
@@ -207,12 +203,7 @@ int main() {
   }
   cout<<endl<<succ_count<<"/"<<num_runs<<endl;
 
-  ofstream outfile("uniform_sample_test.csv");
-  outfile<<"vertex,count"<<endl;
-  for(map<vertex,int>::iterator it=edge_count.begin(); it!=edge_count.end(); it++) { // write num sampled values to file
-    outfile<<it->first<<","<<it->second<<endl;
-  }
-  outfile.close();
+  write_to_file("uniform_sample_test.csv", edge_count);
 }
 
 /*-------------------*
@@ -283,6 +274,7 @@ void generate_random_hash(int n, int m, map<int,int>& hash) {
  * UTILITIES *
  *-----------*/
 
+// parse edge from string "v1 v2" or "(I/D) v1 v2"
 void parse_edge(string str, edge& e) {
   int spaces=count(str.begin(),str.end(),' ');
 
@@ -325,7 +317,7 @@ int identify_endpoint(edge e,vertex target) {
   else return -1;
 }
 
- // initalise 3d array with zero in every index
+ // allocate space of 3d array of long intergers, all values set of 0
 long*** initalise_zero_3d_array(int depth, int num_cols, int num_rows) {
   long*** arr = (long***) malloc(depth * sizeof(long**)); // allocate depth
   for (int i=0; i<depth; i++) {
@@ -341,6 +333,7 @@ long*** initalise_zero_3d_array(int depth, int num_cols, int num_rows) {
   return arr;
 }
 
+// allocate space of 2d array of hash parameters
 hash_params** initalise_2d_hash_params_array(int num_cols, int num_rows) {
   hash_params** arr = (hash_params**) malloc(num_cols * sizeof(hash_params*)); // allocate cols
   // allocate rows
@@ -348,6 +341,7 @@ hash_params** initalise_2d_hash_params_array(int num_cols, int num_rows) {
   return arr;
 }
 
+// free space of 3d array of long integers
 void free_3d_long_array(long*** arr, int depth, int num_cols, int num_rows) {
   for (int d=0; d<depth; d++) {
     for (int c=0; c<num_cols; c++) {
@@ -359,9 +353,20 @@ void free_3d_long_array(long*** arr, int depth, int num_cols, int num_rows) {
   }
 }
 
+// free space of 2d array of hash parameters
 void free_2d_hash_params_array(hash_params** arr, int num_cols, int num_rows) {
   for (int c=0; c<num_cols; c++) {
     hash_params* ptr=arr[c];
     free(ptr);
   }
+}
+
+// write results to a file
+void write_to_file(string outfile_path, map<vertex,int>& edge_count) {
+  ofstream outfile(outfile_path);
+  outfile<<"vertex,count"<<endl;
+  for(map<vertex,int>::iterator it=edge_count.begin(); it!=edge_count.end(); it++) { // write num sampled values to file
+    outfile<<it->first<<","<<it->second<<endl;
+  }
+  outfile.close();
 }
