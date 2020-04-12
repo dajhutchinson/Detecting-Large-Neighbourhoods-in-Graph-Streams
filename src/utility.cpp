@@ -37,7 +37,8 @@ void generate_insertion_deletion(string file_name);
 void list_vertices(string file_name);
 void merge_files(string* file_names, string output_name);
 void greatest_degree(string str, string& vertex, int& degree);
-void count_edges(string file_name, int& count);
+void count_final_edges(string file_name, int& count);
+void count_total_edges(string file_name, int& count);
 void merge_directory(const char* path, string output_name);
 
 /*------*
@@ -45,13 +46,9 @@ void merge_directory(const char* path, string output_name);
  *------*/
 
 int main() {
-  generate_insertion_deletion("data/gplus_large");
-  string greatest; int deg;
-  greatest_degree("data/gplus_large.edges",greatest,deg);
-  cout<<"Greatest Degree "<<greatest<<" "<<deg<<endl;
-  int count;
-  count_edges("data/gplus_large_deletion.edges",count);
-  cout<<"# Edges "<<count<<endl;
+  int lines=0;
+  count_total_edges("graphs/doublepoisson05ID.edges",lines);
+  cout<<lines<<endl;
 
   return 0;
  }
@@ -228,7 +225,7 @@ void greatest_degree(string file_name, string& vertex, int& degree) {
 }
 
 // return number of edges in graph
-void count_edges(string file_name, int& count) {
+void count_final_edges(string file_name, int& count) {
   ifstream stream(file_name);
   string line; count=0; edge e;
   while (getline(stream,line)) {
@@ -236,4 +233,10 @@ void count_edges(string file_name, int& count) {
     if (e.insertion) count+=1;
     else count-=1;
   }
+}
+
+void count_total_edges(string file_name, int& count) {
+  ifstream stream(file_name);
+  count=0; string line;
+  while (getline(stream,line)) count++;
 }
