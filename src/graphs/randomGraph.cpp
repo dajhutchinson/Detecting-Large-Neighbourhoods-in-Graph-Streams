@@ -47,7 +47,7 @@ void insertion_deletion(ofstream& edge_file, ofstream& vertex_file, int num_vert
 int main(int argc, char* argv[]) {
 
   if (argc!=4 && argc!=5) {
-    cout<<"ERROR: ./rg [file_name] [I/ID] [graph_order] (prob_edge)"<<endl; // I=Insertion, ID=Insertion-Deletion
+    cout<<"ERROR: rg [file_name] [I/ID] [graph_order] (prob_edge)"<<endl; // I=Insertion, ID=Insertion-Deletion
   } else {
     string file_name=argv[1];
     string type=argv[2];
@@ -121,13 +121,13 @@ void insertion_deletion(ofstream& edge_file, ofstream& vertex_file, int num_vert
   map<int,int> degrees;
   for (int i=1; i<num_vertices; i++) degrees[i]=0; // record degree of every node
 
-  poisson_distribution<> poisson_d(0.8); // ~Poisson(0)
+  poisson_distribution<> poisson_d(.5); // ~Poisson(n)
 
   for (int i=1; i<num_vertices+1; i++) { // upper right of triangle (above main diagonal)
     int mean_edges=poisson_d(generator);
-    poisson_distribution<> vertex_d(mean_edges);
+    poisson_distribution<> edge_d(mean_edges);
     for (int j=i+1; j<num_vertices+1; j++) {
-      int num_edges=vertex_d(generator);
+      int num_edges=edge_d(generator);
       degrees[i]+=num_edges%2; // update degrees
       degrees[j]+=num_edges%2;
 

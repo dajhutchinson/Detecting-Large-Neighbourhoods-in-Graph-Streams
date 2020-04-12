@@ -18,42 +18,101 @@
 
 using namespace std;
 
+// signatures
+void generate_star_insertion_only(string file_name, int num_vertices);
+void generate_star_insertion_deletion(string file_name, int num_vertices, double proportion);
+
 /*-------*
  *  BODY *
  *-------*/
 
 int main(int argc, char* argv[]) {
 
-  if (argc!=3) {
-    cout<<"ERROR: ./sg [file_name] [graph_order]"<<endl;
-  } else {
+  if (argc!=4 && argc!=5) {
+    cout<<"ERROR: ./sg [file_name] [I/ID] [graph_order] (deletion_probabilty)"<<endl;
+  } else if (argc==4) {
     string file_name=argv[1];
-    int N=atoi(argv[2]); // Graph degree
+    string type=argv[2];
+    int num_vertices=atoi(argv[3]); // Graph degree
 
-    // Prepare files for output
-    ofstream edge_file(file_name+".edges");
-    ofstream vertex_file(file_name+".vertices");
+    if (type=="ID") generate_star_insertion_deletion(file_name,num_vertices,0.01);
+    else if (type=="I") generate_star_insertion_only(file_name,num_vertices);
+    else cout<<"INVALID TYPE - ./sg [file_name] [I/ID] [graph_order] (deletion_probabilty)"<<endl;
 
-    // Choose node to be centre (Uniformly)
-    default_random_engine generator;
-    generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed generator with current time
-    uniform_int_distribution<int> uniform_d(1,N);
-    int centre=uniform_d(generator);
-    cout<<"Centre:"<<centre<<endl;
+  } else if (argc==5) {
+    string file_name=argv[1];
+    int num_vertices=atoi(argv[2]); // Graph degree
+    string type=argv[3];
+    double p=stod(argv[4]);
 
-    // create edge between centre and every other node
-    for (int v=1; v<N+1; v++) {
-      if (v!=centre) {
-        edge_file<<centre<<" "<<v<<endl;
-        vertex_file<<v<<",1"<<endl;
-      } else { // no edge
-        vertex_file<<v<<","<<N-1<<endl;
-      }
-    }
+    if (p<0 || p>=1) cout<<"INVALID PROBABILITY - ./cg [file_name] [I/ID] [graph_order] (deletion_probabilty)"<<endl;
 
-    edge_file.close();
-    vertex_file.close();
-
+    if (type=="ID") generate_star_insertion_deletion(file_name,num_vertices,p);
+    else cout<<"INVALID TYPE - ./sg [file_name] [I/ID] [graph_order] (deletion_probabilty)"<<endl;
   }
   return 0;
+}
+
+/*-------*
+*  BODY *
+*-------*/
+
+void generate_star_insertion_only(string file_name, int num_vertices) {
+  // Prepare files for output
+  ofstream edge_file(file_name+".edges");
+  ofstream vertex_file(file_name+".vertices");
+
+  // Choose node to be centre (Uniformly)
+  default_random_engine generator;
+  generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed generator with current time
+  uniform_int_distribution<int> uniform_d(1,num_vertices);
+  int centre=uniform_d(generator);
+  cout<<"Centre:"<<centre<<endl;
+
+  // create edge between centre and every other node
+  for (int v=1; v<num_vertices+1; v++) {
+    if (v!=centre) {
+      edge_file<<centre<<" "<<v<<endl;
+      vertex_file<<v<<",1"<<endl;
+    } else { // no edge
+      vertex_file<<v<<","<<num_vertices-1<<endl;
+    }
+  }
+
+  edge_file.close();
+  vertex_file.close();
+}
+
+void generate_star_insertion_deletion(string file_name, int num_vertices, double proportion) {
+  // Prepare files for output
+  ofstream edge_file(file_name+".edges");
+  ofstream vertex_file(file_name+".vertices");
+
+  // Choose node to be centre (Uniformly)
+  default_random_engine generator;
+  generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed generator with current time
+  uniform_int_distribution<int> uniform_d(1,num_vertices);
+  bernoulli_distribution bernoulli_d(proportion);
+
+  int centre=uniform_d(generator);
+  cout<<"Centre:"<<centre<<endl;
+
+  // create edge between centre and every other node
+  for (int v=1; v<num_vertices+1; v++) {
+    if (v!=centre) {
+      edge_file<<"I "<<centre<<" "<<v<<endl;
+      vertex_file<<v<<",1"<<endl;
+
+      if (bernoulli_d(generator)) {
+        edge_file<<"D "<<centre<<" "<<v<<endl;
+        edge_file<<"I "<<centre<<" "<<v<<endl;
+      }
+
+    } else { // no edge
+      vertex_file<<v<<","<<num_vertices-1<<endl;
+    }
+  }
+
+  edge_file.close();
+  vertex_file.close();
 }
