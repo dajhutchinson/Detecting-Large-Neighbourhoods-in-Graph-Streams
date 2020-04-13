@@ -9,6 +9,7 @@
 #include <map>
 #include <math.h>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -59,7 +60,7 @@ int main() {
   //display_results(c,d,n,"../../data/facebook.edges");
   //execute_test(2,100,1,reps,d,n,"../../data/facebook.edges","../../results/facebook_results.csv");
   int d=5948, n=12417, reps=10; // NOTE - # edges=1,179,613
-  execute_test(3,20,1,reps,d,n,"../../data/gplus.edges","results_quit_early.csv");
+  execute_test(3,20,1,reps,d,n,"../../data/gplus.edges","results_not_quit_early.csv");
   //int d=104947, n=102100, reps=10; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
   //execute_test(9,17,8,reps,d,n,"../../data/gplus_large.edges","../../results/gplus_large_results.csv");
   return 0;
@@ -201,31 +202,11 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
           BYTES+=sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
           RESEVOIR_BYTES+=sizeof(edge);
         }
-        if (degrees[e.fst]==d2+d1) { // sufficient neighbourhood has been found, return it
-          for (vector<edge>::iterator i=edges[j]->begin(); i!=edges[j]->end(); i++) { // construct neighbourhood to be returned
-            if (i->fst==e.fst) neighbourhood.push_back(i->snd);
-            else if (i->snd==e.fst) neighbourhood.push_back(i->fst);
-          }
-          BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-          RESEVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
-          root=e.fst;
-          return edge_count;
-        }
       } else if (find(resevoirs[j]->begin(),resevoirs[j]->end(),e.snd)!=resevoirs[j]->end()) { // if second endpoint is in resevoir
         if (degrees[e.snd]<=d2+d1) {
           edges[j]->push_back(e);
           BYTES+=sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
           RESEVOIR_BYTES+=sizeof(edge);
-        }
-        if (degrees[e.snd]==d2+d1) { // sufficient neighbourhood has been found, return it
-          for (vector<edge>::iterator i=edges[j]->begin(); i!=edges[j]->end(); i++) { // construct neighbourhood to be returned
-            if (i->fst==e.snd) neighbourhood.push_back(i->snd);
-            else if (i->snd==e.snd) neighbourhood.push_back(i->fst);
-          }
-          BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-          RESEVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
-          root=e.snd;
-          return edge_count;
         }
       }
       BYTES-=sizeof(int); // deletion of d1
@@ -233,6 +214,60 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
 
   }
   cout<<"\rDONE                         "<<endl;
+
+  set<vertex> successful_in_run; // set so each root is chosen uniformly
+  set<pair<int,vertex> > successful_overall;
+  BYTES+=sizeof(set<vertex>)+sizeof(set<pair<int,vertex> >); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+  RESEVOIR_BYTES+=sizeof(set<vertex>)+sizeof(set<pair<int,vertex> >);
+
+  default_random_engine generator;
+  generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
+
+  for (int j=0; j<c; j++) { // find all successful runs
+    int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
+    BYTES-=sizeof(vertex)*successful_in_run.size();
+    RESEVOIR_BYTES-=sizeof(vertex)*successful_in_run.size();
+    successful_in_run.clear();
+
+    // find all successful runs for this resevoir sampler
+    for (vector<vertex>::iterator it=resevoirs[j]->begin(); it!=resevoirs[j]->end(); it++) {
+      if (degrees[*it]>=d1+d2) successful_in_run.insert(*it);
+    }
+    BYTES+=sizeof(vertex)*successful_in_run.size(); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+    RESEVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
+
+    // uniformly choose one at random
+    uniform_int_distribution<int> d(0,successful_in_run.size()-1);
+    int chosen_index=d(generator);
+    set<vertex>::iterator it=successful_in_run.begin();
+    advance(it,chosen_index);
+    vertex chosen_vertex=*it;
+    pair<int,vertex> p(j,chosen_vertex);
+    successful_overall.insert(p);
+    BYTES+=sizeof(int)+sizeof(vertex)+sizeof(pair<int,vertex>); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+    RESEVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
+  }
+
+  if (successful_overall.size()!=0) { // successful run found
+    // choose uniformly at random one of the successful runs
+    uniform_int_distribution<int> overall_d(0,successful_overall.size()-1);
+    int chosen_index=overall_d(generator);
+
+    set<pair<int,vertex> >::iterator it=successful_overall.begin();
+    advance(it,chosen_index);
+    int chosen_run=it->first;
+    vertex chosen_vertex=it->second;
+
+    for (vector<edge>::iterator i=edges[chosen_run]->begin(); i!=edges[chosen_run]->end(); i++) { // construct neighbourhood to be returned
+      if (i->fst==chosen_vertex) neighbourhood.push_back(i->snd);
+      else if (i->snd==chosen_vertex) neighbourhood.push_back(i->fst);
+    }
+
+    BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+    RESEVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
+    root=e.snd;
+    return edge_count;
+  }
 
   // No sucessful runs
   neighbourhood.clear();
