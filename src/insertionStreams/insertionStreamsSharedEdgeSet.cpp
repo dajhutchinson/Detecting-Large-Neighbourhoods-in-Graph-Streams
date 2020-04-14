@@ -1,5 +1,7 @@
 /*-----------------*
  * One pass c-approximation Streaming Algorithm for Neighbourhood Detection for Insertion-Only Graph Streams
+ *
+ *  This implementation terminates after the first sufficiently large neighbourhood is found AND shares an edge set between all the samplers
  *-----------------*/
 
 #include <algorithm>
@@ -9,7 +11,6 @@
 #include <map>
 #include <math.h>
 #include <random>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -45,7 +46,7 @@ void display_results(int c, int d, int n, string file_name);
 int single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root);
 
 // reservoir sampling
-void update_reservoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& reservoir, vector<edge>& edges);
+void update_reservoir(vertex n,int c,int res_num, int d1, int d2, int count, int size, vector<vertex>& reservoir, vector<edge>& edges, map<vertex,int*>& num_reservoirs);
 
 // utility
 void parse_edge(string str, edge& e);
@@ -59,7 +60,7 @@ int main() {
   //int d=586, n=747, reps=100; int c=3;
   //display_results(c,d,n,"../../data/facebook.edges");
 
-  string out_file_path="results_not_quit_early.csv";
+  string out_file_path="results_quit_early.csv";
   int n,d,reps; string edge_file_path;
 
   // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
@@ -72,7 +73,7 @@ int main() {
   //execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
 
   n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
-  out_file_path="results_not_quit_early_gplus.csv";
+  out_file_path="results_shared_edge_set_gplus.csv";
   execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
 
   return 0;
@@ -123,6 +124,7 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
       time_point after=chrono::high_resolution_clock::now(); // time after execution
 
       cout<<root<<endl;
+      cout<<neighbourhood.size()<<"("<<d/c<<")"<<endl<<endl;
 
       stream.close();
 
@@ -155,17 +157,15 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
   int size=ceil(log10(n)*pow(n,(double)1/c));
 
   // initalise edge & vector sets for each parallel run
-  vector<vertex>* reservoirs[c]; vector<edge>* edges[c];
-  for (int i=0; i<c; i++) {
-    reservoirs[i]=new vector<vertex>;
-    edges[i]=new vector<edge>;
-  }
-  BYTES+=c*(sizeof(vector<vertex>)+sizeof(vector<edge>));
-  RESERVOIR_BYTES+=c*(sizeof(vector<vertex>)+sizeof(vector<edge>));
+  vector<vertex>* reservoirs[c]; vector<edge> edges;
+  for (int i=0; i<c; i++) reservoirs[i]=new vector<vertex>;
+  BYTES+=c*(sizeof(vector<vertex>))+sizeof(vector<edge>);
+  RESERVOIR_BYTES+=c*(sizeof(vector<vertex>))+sizeof(vector<edge>);
 
   string line; edge e; map<vertex,int> degrees; // these are shared for each run
+  map<vertex,int*> num_reservoirs;
   int count[c];  // counts the number of vertexs >=d1
-  BYTES+=sizeof(string)+sizeof(edge)+sizeof(map<vertex,int>)+sizeof(int);
+  BYTES+=sizeof(string)+sizeof(edge)+2*sizeof(map<vertex,int>)+sizeof(int);
   DEGREE_BYTES+=sizeof(map<vertex,int>);
 
   int edge_count=0;
@@ -191,6 +191,7 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
       DEGREE_BYTES+=sizeof(vertex)+sizeof(int)+sizeof(void*);
     }
 
+    // update reservoirs
     for (int j=0; j<c; j++) { // perform parallel runs
       int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
       BYTES+=sizeof(int);
@@ -199,99 +200,70 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
       // Consider adding first vertex to the reservoir
       if (degrees[e.fst]==d1) {
         count[j]+=1; // increment number of d1 degree vertexs
-        update_reservoir(e.fst,d1,d2,count[j],size,*reservoirs[j],*edges[j]); // possibly add value to reservoir
+        update_reservoir(e.fst,c,j,d1,d2,count[j],size,*reservoirs[j],edges,num_reservoirs); // possibly add value to reservoir
       }
 
       // Consider adding second vertex to the reservoir
       if (degrees[e.snd]==d1) {
         count[j]+=1; // increment number of d1 degree vertexs
-        update_reservoir(e.snd,d1,d2,count[j],size,*reservoirs[j],*edges[j]); // possibly add value to reservoir
+        update_reservoir(e.snd,c,j,d1,d2,count[j],size,*reservoirs[j],edges,num_reservoirs); // possibly add value to reservoir
       }
 
-      if (find(reservoirs[j]->begin(),reservoirs[j]->end(),e.fst)!=reservoirs[j]->end()) { // if first endpoint is in reservoir
-        if (degrees[e.fst]<=d2+d1) {
-          edges[j]->push_back(e);
-          BYTES+=sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-          RESERVOIR_BYTES+=sizeof(edge);
-        }
-      } else if (find(reservoirs[j]->begin(),reservoirs[j]->end(),e.snd)!=reservoirs[j]->end()) { // if second endpoint is in reservoir
-        if (degrees[e.snd]<=d2+d1) {
-          edges[j]->push_back(e);
-          BYTES+=sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-          RESERVOIR_BYTES+=sizeof(edge);
-        }
-      }
       BYTES-=sizeof(int); // deletion of d1
+    }
+
+    // update edge set
+    // TODO think (kind of seems like I am cheating here as it essentially adds the edge if it has an endpoint in any reservoir regardless of the bounds of that reservoir, but I'm pretty sure this is acceptable as the edge would always be added if it is in a reservoir)
+    // Only variation here is that
+    bool inserted=false;
+    if (num_reservoirs.find(e.fst)!=num_reservoirs.end()) { // if first endpoint is in reservoir
+      for (int j=0; j<c; j++) {
+        int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
+        if (num_reservoirs[e.fst][j]>0 && degrees[e.fst]<=d2+d1) {
+          edges.push_back(e);
+          BYTES+=sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+          RESERVOIR_BYTES+=sizeof(edge);
+          inserted=true;
+        }
+        if (num_reservoirs[e.fst][j]>0 && degrees[e.fst]==d2+d1) { // sufficient neighbourhood has been found, return it
+          cout<<endl<<"*"<<degrees[e.snd]<<"/"<<edges.size()<<endl;
+          for (vector<edge>::iterator i=edges.begin(); i!=edges.end(); i++) { // construct neighbourhood to be returned
+            if (i->fst==e.fst) neighbourhood.push_back(i->snd);
+            else if (i->snd==e.fst) neighbourhood.push_back(i->fst);
+          }
+          BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+          RESERVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
+          root=e.fst;
+          return edge_count;
+        }
+        if (inserted) break;
+      }
+    } else if (num_reservoirs.find(e.snd)!=num_reservoirs.end()) { // if second endpoint is in a reservoir
+      for (int j=0; j<c; j++) {
+        int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
+        if (num_reservoirs[e.snd][j]>0 && degrees[e.snd]<=d2+d1) {
+          edges.push_back(e);
+          BYTES+=sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+          RESERVOIR_BYTES+=sizeof(edge);
+          inserted=true;
+        }
+        if (num_reservoirs[e.snd][j]>0 && degrees[e.snd]==d2+d1) { // sufficient neighbourhood has been found, return it
+          cout<<endl<<"*"<<degrees[e.snd]<<"/"<<edges.size()<<endl;
+          for (vector<edge>::iterator i=edges.begin(); i!=edges.end(); i++) { // construct neighbourhood to be returned
+            if (i->fst==e.snd) neighbourhood.push_back(i->snd);
+            else if (i->snd==e.snd) neighbourhood.push_back(i->fst);
+          }
+          BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+          RESERVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
+          root=e.snd;
+          return edge_count;
+        }
+        if (inserted) break;
+      }
     }
 
   }
   cout<<"\rDONE                         "<<endl;
-
-  set<vertex> successful_in_run; // set so each root is chosen uniformly
-  set<pair<int,vertex> > successful_overall;
-  BYTES+=sizeof(set<vertex>)+sizeof(set<pair<int,vertex> >); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-  RESERVOIR_BYTES+=sizeof(set<vertex>)+sizeof(set<pair<int,vertex> >);
-
-  default_random_engine generator;
-  generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
-
-  // cout<<"FINDING sucessful runs"<<endl;
-  for (int j=0; j<c; j++) { // find all successful runs
-    int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
-    // cout<<j<<","<<d1<<endl;
-    BYTES-=sizeof(vertex)*successful_in_run.size();
-    RESERVOIR_BYTES-=sizeof(vertex)*successful_in_run.size();
-    successful_in_run.clear();
-    // cout<<j<<"A"<<endl;
-    // find all successful runs for this reservoir sampler
-    for (vector<vertex>::iterator it=reservoirs[j]->begin(); it!=reservoirs[j]->end(); it++) {
-      if (degrees[*it]>=d1+d2) {
-        successful_in_run.insert(*it);
-        // cout<<j<<"SUCCESS FOUND"<<endl;
-      }
-    }
-    // cout<<j<<"B"<<endl;
-    BYTES+=sizeof(vertex)*successful_in_run.size(); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-    RESERVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
-
-    // cout<<j<<"C"<<endl;
-    // uniformly choose one at random if one exists
-    if (successful_in_run.size()!=0) {
-      uniform_int_distribution<int> d(0,successful_in_run.size()-1);
-      int chosen_index=d(generator);
-      set<vertex>::iterator it=successful_in_run.begin();
-      advance(it,chosen_index);
-      vertex chosen_vertex=*it;
-      pair<int,vertex> p(j,chosen_vertex);
-      successful_overall.insert(p);
-      BYTES+=sizeof(int)+sizeof(vertex)+sizeof(pair<int,vertex>); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-      RESERVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
-    }
-    // cout<<j<<"D"<<endl;
-  }
-  // cout<<"FOUND SUCCESSFUL RUNS"<<endl;
-
-  if (successful_overall.size()!=0) { // successful run found
-    // choose uniformly at random one of the successful runs
-    uniform_int_distribution<int> overall_d(0,successful_overall.size()-1);
-    int chosen_index=overall_d(generator);
-
-    set<pair<int,vertex> >::iterator it=successful_overall.begin();
-    advance(it,chosen_index);
-    int chosen_run=it->first;
-    vertex chosen_vertex=it->second;
-
-    for (vector<edge>::iterator i=edges[chosen_run]->begin(); i!=edges[chosen_run]->end(); i++) { // construct neighbourhood to be returned
-      if (i->fst==chosen_vertex) neighbourhood.push_back(i->snd);
-      else if (i->snd==chosen_vertex) neighbourhood.push_back(i->fst);
-    }
-
-    BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-    RESERVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
-    root=chosen_vertex;
-    // cout<<"RESULT chosen"<<endl;
-    return edge_count;
-  }
 
   // No sucessful runs
   neighbourhood.clear();
@@ -301,11 +273,20 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
   return edge_count;
 }
 
-void update_reservoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& reservoir, vector<edge>& edges) {
+void update_reservoir(vertex n,int c,int res_num, int d1, int d2, int count, int size, vector<vertex>& reservoir, vector<edge>& edges, map<vertex,int*>& num_reservoirs) {
   if (reservoir.size()<size) { // reservoir is not full
     reservoir.push_back(n);
     BYTES+=sizeof(vertex); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
     RESERVOIR_BYTES+=2*sizeof(vertex);
+    if (num_reservoirs.find(n)==num_reservoirs.end()) {
+      //cout<<"NEW ENTRY";
+      int* arr_p=new int[c];
+      for (int j=0; j<c; j++) arr_p[j]=0;
+      arr_p[res_num]=1;
+      num_reservoirs[n]=arr_p;
+      BYTES+=sizeof(vertex)+sizeof(int*)+sizeof(int)*c; if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+      RESERVOIR_BYTES+=sizeof(vertex)+sizeof(int*)+sizeof(int)*c;
+    } else num_reservoirs[n][res_num]+=1;
   } else { // reservoir is full
     default_random_engine generator;
     generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
@@ -313,35 +294,50 @@ void update_reservoir(vertex n, int d1, int d2, int count, int size, vector<vert
     BYTES+=sizeof(default_random_engine)+sizeof(bernoulli_distribution);
     if (bernoulli_d(generator)) { // if coin flip passes
       uniform_int_distribution<unsigned long> uniform_d(0,size-1); // decide which vertex to delete
-      int to_delete=uniform_d(generator);
 
+      int to_delete=uniform_d(generator);
       vertex to_delete_val=reservoir[to_delete];
       BYTES+=2*sizeof(vertex);
       RESERVOIR_BYTES+=2*sizeof(vertex);
+      if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
       if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
 
+      // update reservoirs
       reservoir.erase(reservoir.begin()+to_delete);
       reservoir.push_back(n);
-      // NB No space change
 
+      // delete if empty
+      num_reservoirs[to_delete_val][res_num]=0;
+      int count=0;
+      for (int j=0; j<c; j++) count+=num_reservoirs[to_delete_val][j];
+      if (count==0) {
+        num_reservoirs.erase(to_delete_val);
+        BYTES-=sizeof(vertex)+sizeof(int*)+sizeof(int)*c;
+        RESERVOIR_BYTES-=sizeof(vertex)+sizeof(int*)+sizeof(int)*c;
+      }
+
+      // add new
+      if (num_reservoirs.find(n)==num_reservoirs.end()) {
+        int* arr_p=new int[c];
+        for (int j=0; j<c; j++) arr_p[j]=0;
+        arr_p[res_num]=1;
+        num_reservoirs[n]=arr_p;
+        BYTES+=sizeof(vertex)+sizeof(int*)+sizeof(int)*c; if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+        RESERVOIR_BYTES+=sizeof(vertex)+sizeof(int*)+sizeof(int)*c;
+      } else num_reservoirs[n][res_num]=1;
+
+      // NB No space change
       // removes edges adjacent to vertex to be deleted (which are not adjacent to another vertex in the reservoir)
       vector<edge>::iterator i=edges.begin();
       while (i!=edges.end()) {
+        // count number of resevoirs endpoints appear in
+        int sum_fst=0, sum_snd=0;
+        if (num_reservoirs.find(i->fst)!=num_reservoirs.end()) for (int j=0; j<c; j++) sum_fst+=num_reservoirs[i->fst][j];
+        if (num_reservoirs.find(i->snd)!=num_reservoirs.end()) for (int j=0; j<c; j++) sum_snd+=num_reservoirs[i->snd][j];
 
-        if (i->fst==to_delete_val) {
-          if (find(reservoir.begin(),reservoir.end(),i->snd)==reservoir.end()) { // edge not adjacent to another value in the reservoir
-            i=edges.erase(i); // next edge
-            if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
-            BYTES-=sizeof(edge);RESERVOIR_BYTES-=sizeof(edge);
-          } else i++; // next edge
-
-        } else if (i->snd==to_delete_val) {
-          if (find(reservoir.begin(),reservoir.end(),i->fst)==reservoir.end()) { // edge not adjacent to another value in the reservoir
-            i=edges.erase(i); // next edge
-            if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
-            BYTES-=sizeof(edge);RESERVOIR_BYTES-=sizeof(edge);
-          } else i++; // next edge
-
+        if (sum_fst==0 && sum_snd==0) { // edge not adjacent to another value in any other reservoir
+          i=edges.erase(i); // next edge
+          BYTES-=sizeof(edge);RESERVOIR_BYTES-=sizeof(edge);
         } else i++; // next edge
 
       }

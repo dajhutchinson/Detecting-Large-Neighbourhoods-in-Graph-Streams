@@ -70,8 +70,8 @@ int main() {
   //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000complete.edges"; // NOTE - # edges=499,500
   //execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
 
-  n=102100; d=104947; reps=10; edge_file_path="../../data/gplus_large.edges"; // NOTE - # edges=30,238,035
-  out_file_path="results_quit_early_gplus_large.csv";
+  n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
+  out_file_path="results_quit_early_gplus.csv";
   execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
 
   return 0;
@@ -122,6 +122,7 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
       time_point after=chrono::high_resolution_clock::now(); // time after execution
 
       cout<<root<<endl;
+      cout<<neighbourhood.size()<<"("<<d/c<<")"<<endl<<endl;
 
       stream.close();
 
@@ -214,6 +215,7 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
           RESERVOIR_BYTES+=sizeof(edge);
         }
         if (degrees[e.fst]==d2+d1) { // sufficient neighbourhood has been found, return it
+          cout<<endl<<"*"<<degrees[e.fst]<<endl;
           for (vector<edge>::iterator i=edges[j]->begin(); i!=edges[j]->end(); i++) { // construct neighbourhood to be returned
             if (i->fst==e.fst) neighbourhood.push_back(i->snd);
             else if (i->snd==e.fst) neighbourhood.push_back(i->fst);
@@ -230,6 +232,7 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
           RESERVOIR_BYTES+=sizeof(edge);
         }
         if (degrees[e.snd]==d2+d1) { // sufficient neighbourhood has been found, return it
+          cout<<endl<<"*"<<degrees[e.snd]<<endl;
           for (vector<edge>::iterator i=edges[j]->begin(); i!=edges[j]->end(); i++) { // construct neighbourhood to be returned
             if (i->fst==e.snd) neighbourhood.push_back(i->snd);
             else if (i->snd==e.snd) neighbourhood.push_back(i->fst);
