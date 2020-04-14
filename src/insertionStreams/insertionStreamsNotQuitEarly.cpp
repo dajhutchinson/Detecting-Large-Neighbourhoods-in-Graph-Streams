@@ -58,11 +58,23 @@ double variance(vector<int> vals);
 int main() {
   //int d=586, n=747, reps=100; int c=3;
   //display_results(c,d,n,"../../data/facebook.edges");
-  //execute_test(2,100,1,reps,d,n,"../../data/facebook.edges","../../results/facebook_results.csv");
-  int d=5948, n=12417, reps=10; // NOTE - # edges=1,179,613
-  execute_test(3,20,1,reps,d,n,"../../data/gplus.edges","results_not_quit_early.csv");
-  //int d=104947, n=102100, reps=10; // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
-  //execute_test(9,17,8,reps,d,n,"../../data/gplus_large.edges","../../results/gplus_large_results.csv");
+
+  string out_file_path="results_not_quit_early.csv";
+  int n,d,reps; string edge_file_path;
+
+  // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
+  //n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
+  //n=102100; d=104947; reps=10; edge_file_path="../../data/gplus_large.edges"; // NOTE - # edges=30,238,035
+  //n=52; d=35; reps=10; edge_file_path="../../data/facebook_small.edges"; // NOTE - # edges=292
+  //n=747; d=586; reps=10; edge_file_path="../../data/facebook.edges"; // NOTE - # edges=60,050
+  //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000star.edges"; // NOTE - # edges=999
+  //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000complete.edges"; // NOTE - # edges=499,500
+  //execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
+
+  n=102100; d=104947; reps=10; edge_file_path="../../data/gplus_large.edges"; // NOTE - # edges=30,238,035
+  out_file_path="results_not_quit_early_gplus_large.csv";
+  execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
+
   return 0;
 }
 
@@ -223,30 +235,41 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
   default_random_engine generator;
   generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
 
+  // cout<<"FINDING sucessful runs"<<endl;
   for (int j=0; j<c; j++) { // find all successful runs
     int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
+    // cout<<j<<","<<d1<<endl;
     BYTES-=sizeof(vertex)*successful_in_run.size();
     RESEVOIR_BYTES-=sizeof(vertex)*successful_in_run.size();
     successful_in_run.clear();
-
+    // cout<<j<<"A"<<endl;
     // find all successful runs for this resevoir sampler
     for (vector<vertex>::iterator it=resevoirs[j]->begin(); it!=resevoirs[j]->end(); it++) {
-      if (degrees[*it]>=d1+d2) successful_in_run.insert(*it);
+      if (degrees[*it]>=d1+d2) {
+        successful_in_run.insert(*it);
+        // cout<<j<<"SUCCESS FOUND"<<endl;
+      }
     }
+    // cout<<j<<"B"<<endl;
     BYTES+=sizeof(vertex)*successful_in_run.size(); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
     RESEVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
 
-    // uniformly choose one at random
-    uniform_int_distribution<int> d(0,successful_in_run.size()-1);
-    int chosen_index=d(generator);
-    set<vertex>::iterator it=successful_in_run.begin();
-    advance(it,chosen_index);
-    vertex chosen_vertex=*it;
-    pair<int,vertex> p(j,chosen_vertex);
-    successful_overall.insert(p);
-    BYTES+=sizeof(int)+sizeof(vertex)+sizeof(pair<int,vertex>); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-    RESEVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
+    // cout<<j<<"C"<<endl;
+    // uniformly choose one at random if one exists
+    if (successful_in_run.size()!=0) {
+      uniform_int_distribution<int> d(0,successful_in_run.size()-1);
+      int chosen_index=d(generator);
+      set<vertex>::iterator it=successful_in_run.begin();
+      advance(it,chosen_index);
+      vertex chosen_vertex=*it;
+      pair<int,vertex> p(j,chosen_vertex);
+      successful_overall.insert(p);
+      BYTES+=sizeof(int)+sizeof(vertex)+sizeof(pair<int,vertex>); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
+      RESEVOIR_BYTES+=sizeof(vertex)*successful_in_run.size();
+    }
+    // cout<<j<<"D"<<endl;
   }
+  // cout<<"FOUND SUCCESSFUL RUNS"<<endl;
 
   if (successful_overall.size()!=0) { // successful run found
     // choose uniformly at random one of the successful runs
@@ -265,7 +288,8 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
 
     BYTES+=neighbourhood.size()*sizeof(edge); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
     RESEVOIR_BYTES+=neighbourhood.size()*sizeof(edge);
-    root=e.snd;
+    root=chosen_vertex;
+    // cout<<"RESULT chosen"<<endl;
     return edge_count;
   }
 
@@ -277,38 +301,49 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
   return edge_count;
 }
 
-void update_resevoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& resevoir, vector<edge>& edges) {
-  if (resevoir.size()<size) { // resevoir is not full
-    resevoir.push_back(n);
+void update_reservoir(vertex n, int d1, int d2, int count, int size, vector<vertex>& reservoir, vector<edge>& edges) {
+  if (reservoir.size()<size) { // reservoir is not full
+    reservoir.push_back(n);
     BYTES+=sizeof(vertex); if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
-    RESEVOIR_BYTES+=2*sizeof(vertex);
-  } else { // resevoir is full
+    RESERVOIR_BYTES+=2*sizeof(vertex);
+  } else { // reservoir is full
     default_random_engine generator;
     generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
     bernoulli_distribution bernoulli_d((float)size/(float)count);
     BYTES+=sizeof(default_random_engine)+sizeof(bernoulli_distribution);
     if (bernoulli_d(generator)) { // if coin flip passes
-
       uniform_int_distribution<unsigned long> uniform_d(0,size-1); // decide which vertex to delete
       int to_delete=uniform_d(generator);
 
-      vertex to_delete_val=resevoir[to_delete];
+      vertex to_delete_val=reservoir[to_delete];
       BYTES+=2*sizeof(vertex);
-      RESEVOIR_BYTES+=2*sizeof(vertex);
+      RESERVOIR_BYTES+=2*sizeof(vertex);
       if (BYTES>MAX_BYTES) MAX_BYTES=BYTES;
 
-      resevoir.erase(resevoir.begin()+to_delete);
-      resevoir.push_back(n);
+      reservoir.erase(reservoir.begin()+to_delete);
+      reservoir.push_back(n);
       // NB No space change
 
+      // removes edges adjacent to vertex to be deleted (which are not adjacent to another vertex in the reservoir)
       vector<edge>::iterator i=edges.begin();
       while (i!=edges.end()) {
-        if (i->fst==to_delete_val || i->snd==to_delete_val) {
-          i=edges.erase(i);
-          if (RESEVOIR_BYTES>MAX_RESEVOIR_BYTES) MAX_RESEVOIR_BYTES=RESEVOIR_BYTES;
-          BYTES-=sizeof(edge);RESEVOIR_BYTES-=sizeof(edge);
-        }
-        else i++;
+
+        if (i->fst==to_delete_val) {
+          if (find(reservoir.begin(),reservoir.end(),i->snd)==reservoir.end()) { // edge not adjacent to another value in the reservoir
+            i=edges.erase(i); // next edge
+            if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
+            BYTES-=sizeof(edge);RESERVOIR_BYTES-=sizeof(edge);
+          } else i++; // next edge
+
+        } else if (i->snd==to_delete_val) {
+          if (find(reservoir.begin(),reservoir.end(),i->fst)==reservoir.end()) { // edge not adjacent to another value in the reservoir
+            i=edges.erase(i); // next edge
+            if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
+            BYTES-=sizeof(edge);RESERVOIR_BYTES-=sizeof(edge);
+          } else i++; // next edge
+
+        } else i++; // next edge
+
       }
       BYTES-=2*sizeof(int);
     }
