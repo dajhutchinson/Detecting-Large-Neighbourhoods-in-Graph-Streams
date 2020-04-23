@@ -41,12 +41,18 @@ void greatest_degree(string str, string& vertex, int& degree);
 void count_final_edges(string file_name, int& count);
 void count_total_edges(string file_name, int& count);
 void merge_directory(const char* path, string output_name);
+void remove_duplicates(string input_path, string output_path);
 
 /*------*
  * BODY *
  *------*/
 
 int main() {
+  relabel_vertices("../data/facebook.edges","facebook.edges");
+  list_vertices("facebook");
+  generate_insertion_deletion("facebook");
+  list_vertices("facebook_deletion");
+
   return 0;
  }
 
@@ -152,14 +158,14 @@ void list_vertices(string file_name) {
   }
 }
 
-// relabel vertices of ID stream so they are all in [0,n)
+// relabel vertices of IO stream so they are all in [0,n)
 void relabel_vertices(string input_path, string output_path) {
   ifstream stream(input_path);
   ofstream outfile(output_path);
 
   map<vertex,int> new_labels; string line; edge e;
   map<vertex,int>::iterator it;
-  int count=0, i=0;
+  int count=1, i=0;
 
   while (getline(stream,line)) {
     i++;
@@ -184,7 +190,7 @@ void relabel_vertices(string input_path, string output_path) {
       count++;
     } else new_snd=it->second;
 
-    outfile<<line[0]<<" "<<new_fst<<" "<<new_snd<<endl;
+    outfile<<new_fst<<" "<<new_snd<<endl;
   }
   cout<<"\rDONE                 ";
 }
@@ -273,4 +279,42 @@ void count_total_edges(string file_name, int& count) {
   ifstream stream(file_name);
   count=0; string line;
   while (getline(stream,line)) count++;
+}
+
+// remove duplicate edges from IO stream
+void remove_duplicates(string input_path, string output_path) {
+  ifstream stream(input_path);
+  ofstream outfile(output_path);
+
+  map<vertex,set<vertex> > neighbourhoods; string line; edge e;
+  map<vertex,set<vertex> >::iterator it_fst, it_snd;
+  int count=1, i=0;
+
+  while (getline(stream,line)) {
+    i++;
+    if (i%100000==0) cout<<"\r"<<i; // update on how many edges have been checked
+    parse_edge(line,e);
+
+    // check existence in map
+    it_fst=neighbourhoods.find(e.fst);
+    if (it_fst==neighbourhoods.end()) { // not in map
+      set<vertex> s;
+      neighbourhoods[e.fst]=s;
+    }
+
+    it_snd=neighbourhoods.find(e.snd);
+    if (it_snd==neighbourhoods.end()) { // not in map
+      set<vertex> s;
+      neighbourhoods[e.snd]=s;
+    }
+
+    if (neighbourhoods[e.fst].find(e.snd)==neighbourhoods[e.fst].end()) {
+      outfile<<e.fst<<" "<<e.snd<<endl;
+    }
+
+    neighbourhoods[e.fst].insert(e.snd);
+    neighbourhoods[e.snd].insert(e.fst);
+
+  }
+  cout<<"\rDONE                 ";
 }
