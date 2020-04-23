@@ -32,6 +32,7 @@ struct edge { // undirected edge
  * SIGNATURES *
  *------------*/
 
+void relabel_vertices(string input_path, string output_path);
 void parse_edge(string str, edge& e);
 void generate_insertion_deletion(string file_name);
 void list_vertices(string file_name);
@@ -46,10 +47,6 @@ void merge_directory(const char* path, string output_name);
  *------*/
 
 int main() {
-  int lines=0;
-  count_total_edges("graphs/doublepoisson05ID.edges",lines);
-  cout<<lines<<endl;
-
   return 0;
  }
 
@@ -131,7 +128,7 @@ void list_vertices(string file_name) {
 
   while (getline(stream,line)) {
     i+=1;
-    if (i%100000==0) cout<<i<<","; // update on how many edges have been checked
+    if (i%100000==0) cout<<"\r"<<i; // update on how many edges have been checked
     parse_edge(line,e);
 
     if (degrees.count(e.fst)) { // vertex already in graph
@@ -148,11 +145,48 @@ void list_vertices(string file_name) {
       degrees[e.snd]=1; // cannot delete an edge which is not in the graph
     }
   }
-
+  cout<<endl;
   // write to vertices file
   for (map<string,int>::iterator i=degrees.begin(); i!=degrees.end(); i++) {
     outfile<<i->first<<","<<i->second<<endl; // name,degree
   }
+}
+
+// relabel vertices of ID stream so they are all in [0,n)
+void relabel_vertices(string input_path, string output_path) {
+  ifstream stream(input_path);
+  ofstream outfile(output_path);
+
+  map<vertex,int> new_labels; string line; edge e;
+  map<vertex,int>::iterator it;
+  int count=0, i=0;
+
+  while (getline(stream,line)) {
+    i++;
+    if (i%100000==0) cout<<"\r"<<i; // update on how many edges have been checked
+    parse_edge(line,e);
+
+    int new_fst, new_snd;
+
+    // get new label for fst
+    it=new_labels.find(e.fst);
+    if (it==new_labels.end()) { // not currently mapped
+      new_labels[e.fst]=count;
+      new_fst=count;
+      count++;
+    } else new_fst=it->second;
+
+    // get new label for snd
+    it=new_labels.find(e.snd);
+    if (it==new_labels.end()) { // not currently mapped
+      new_labels[e.snd]=count;
+      new_snd=count;
+      count++;
+    } else new_snd=it->second;
+
+    outfile<<line[0]<<" "<<new_fst<<" "<<new_snd<<endl;
+  }
+  cout<<"\rDONE                 ";
 }
 
 // parse ege from stream
