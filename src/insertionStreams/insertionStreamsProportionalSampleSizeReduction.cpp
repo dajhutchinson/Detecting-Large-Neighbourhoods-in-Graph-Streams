@@ -1,7 +1,8 @@
 /*-----------------*
  * One pass c-approximation Streaming Algorithm for Neighbourhood Detection for Insertion-Only Graph Streams
  *
- *  This implementation terminates after the first sufficiently large neighbourhood is found AND shares an edge set between all the samplers
+ * This uses the implementation which terminates early AND has a shared edge set AND uses a reduced number of samplers.
+ * Here we can test reducing the sample size by a certain proportion of its proposed value
  *-----------------*/
 
 #include <algorithm>
@@ -40,11 +41,12 @@ struct edge { // undirected edge
 *------------*/
 
 // size = size of reservoir
-void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file); // for (int c=c_min;c<=c_max;c+=c_step). Reps is the number of times each c is tested, average is taken.
+void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file, double p_min, double p_max, double p_step); // for (int c=c_min;c<=c_max;c+=c_step). Reps is the number of times each c is tested, average is taken.
 void display_results(int c, int d, int n, string file_name);
 
 // main algorithm
-int single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root);
+// sample size = p*proposed size
+int single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root, double prop);
 
 // reservoir sampling
 void update_reservoir(vertex n,int c,int res_num, int d1, int d2, int count, int size, vector<vertex>& reservoir, vector<edge>& edges, map<vertex,bool*>& num_reservoirs);
@@ -61,7 +63,7 @@ int main() {
   //int d=586, n=747, reps=100; int c=3;
   //display_results(c,d,n,"../../data/facebook.edges");
 
-  string out_file_path="results_shared_edges.csv";
+  string out_file_path="results_proportional_sample_size_reduction.csv";
   int n,d,reps; string edge_file_path;
 
   // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
@@ -73,100 +75,95 @@ int main() {
   //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000complete.edges"; // NOTE - # edges=499,500
   //execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
 
-  n=102100; d=104947; reps=5; edge_file_path="../../data/gplus_large.edges"; // NOTE - # edges=30,238,035
-  out_file_path="2_results_technical_optimisation_gplus_large.csv";
-  execute_test(2,3,1,reps,d,n,edge_file_path,out_file_path);
+  n=747; d=586; reps=10; edge_file_path="../../data/facebook.edges"; // NOTE - # edges=60,050
+  out_file_path="results_proportional_sample_size_reduction_facebook.csv";
+  execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path,0.01,2,0.1);
+
+  n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
+  out_file_path="results_proportional_sample_size_reduction_gplus.csv";
+  execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path,0.01,2,0.1);
+
 
   return 0;
 }
 
-void display_results(int c, int d, int n, string file_name) {
-  vector<vertex> neighbourhood; vertex root; // variables for returned values
-  ifstream stream(file_name);
-  BYTES=0; RESERVOIR_BYTES=0; DEGREE_BYTES=0; MAX_BYTES=0; MAX_RESERVOIR_BYTES=0;
-
-  time_point before=chrono::high_resolution_clock::now(); // time before execution
-  int edges_checked=single_pass_insertion_stream(c,d,n,stream,neighbourhood,root);
-  time_point after=chrono::high_resolution_clock::now(); // time after execution
-
-  cout<<"Root Node - "<<root<<endl;
-  cout<<"Neighbourhood Size - "<<neighbourhood.size()<<endl;
-  cout<<"# edges checked - "<<edges_checked<<endl;
-  cout<<"Time - "<<chrono::duration_cast<chrono::seconds>(after-before).count()<<" seconds"<<endl;
-
-  if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
-
-  cout<<"MAX RESERVOIR - "<<(float)MAX_RESERVOIR_BYTES/1048576<<" mb"<<endl;
-  cout<<"MAX DEGREE - "<<(float)DEGREE_BYTES/1048576<<" mb"<<endl;
-  //for (vector<vertex>::iterator i=neighbourhood.begin(); i!=neighbourhood.end(); i++) cout<<*i<<",";
-}
-
 // Runs algorithm multiple time, writing results to a csv file
-void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file) {
+void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string file_name, string out_file, double p_min, double p_max, double p_step) {
   ofstream outfile(out_file);
   outfile<<"name,"<<file_name<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<"repetitions,"<<reps<<endl<<endl; // test details
-  outfile<<"c,time (microseconds),mean max space (bytes),mean reservoir space (bytes),mean degree space (bytes),mean edges checked,variance time, variance max space,variance reservoir space, variance degree space,varriance edges checked,successes"<<endl; // headers
+  outfile<<"c,p,time (microseconds),mean max space (bytes),mean reservoir space (bytes),mean degree space (bytes),mean edges checked,variance time, variance max space,variance reservoir space, variance degree space,varriance edges checked,successes"<<endl; // headers
   vector<vertex> neighbourhood; vertex root; // variables for returned values
   vector<int> times, total_space, reservoir_space, degree_space, edges_checked; // results of each run of c
   int successes;
   for (int c=c_min;c<=c_max;c+=c_step) {
-    successes=0;
-    times.clear(); total_space.clear(); reservoir_space.clear(); degree_space.clear(); edges_checked.clear();// reset for new run of c
-    for (int i=0;i<reps;i++) {
-      cout<<"("<<i<<"/"<<reps<<") "<<c<<"/"<<c_max<<" "<<file_name<<" technical optimisation"<<endl; // output to terminal
 
-      // reset values
-      BYTES=0; RESERVOIR_BYTES=0; DEGREE_BYTES=0; MAX_BYTES=0; MAX_RESERVOIR_BYTES=0;
-      neighbourhood.clear(); vertex* p=&root; p=nullptr;
-      ifstream stream(file_name); // file to read
+    double prop;
+    for (prop=p_max; prop>=p_min; prop-=p_step) {
 
-      time_point before=chrono::high_resolution_clock::now(); // time before execution
-      edges_checked.push_back(single_pass_insertion_stream(c,d,n,stream,neighbourhood,root));
-      time_point after=chrono::high_resolution_clock::now(); // time after execution
+      times.clear(); total_space.clear(); reservoir_space.clear(); degree_space.clear(); edges_checked.clear();// reset for new run of c
+      successes=0;
+      for (int i=0;i<reps;i++) {
+        cout<<"("<<i<<"/"<<reps<<") "<<c<<"/"<<c_max<<" <"<<p_min<<"-"<<prop<<"-"<<p_max<<">"<<endl; // output to terminal
 
-      cout<<root<<endl;
-      cout<<neighbourhood.size()<<"("<<d/c<<")"<<endl<<endl;
+        // reset values
+        BYTES=0; RESERVOIR_BYTES=0; DEGREE_BYTES=0; MAX_BYTES=0; MAX_RESERVOIR_BYTES=0;
+        neighbourhood.clear(); vertex* p=&root; p=nullptr;
+        ifstream stream(file_name); // file to read
 
-      stream.close();
+        time_point before=chrono::high_resolution_clock::now(); // time before execution
+        edges_checked.push_back(single_pass_insertion_stream(c,d,n,stream,neighbourhood,root,prop));
+        time_point after=chrono::high_resolution_clock::now(); // time after execution
 
-      if (neighbourhood.size()!=0) successes+=1;
+        cout<<root<<endl;
+        cout<<neighbourhood.size()<<"("<<d/c<<")"<<endl;
 
-      auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count(); // time passed
-      cout<<duration/1000000<<"s"<<endl<<endl;
-      if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
-      times.push_back(duration); total_space.push_back(MAX_BYTES); reservoir_space.push_back(MAX_RESERVOIR_BYTES); degree_space.push_back(DEGREE_BYTES);
+        stream.close();
+
+        if (neighbourhood.size()!=0) successes+=1;
+
+        auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count(); // time passed
+        cout<<duration/1000000<<"s"<<endl<<endl;
+
+        if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
+        times.push_back(duration); total_space.push_back(MAX_BYTES); reservoir_space.push_back(MAX_RESERVOIR_BYTES); degree_space.push_back(DEGREE_BYTES);
+      }
+      int mean_duration      =accumulate(times.begin(),times.end(),0)/times.size();
+      int mean_total_space   =accumulate(total_space.begin(),total_space.end(),0)/total_space.size();
+      int mean_reservoir_space=accumulate(reservoir_space.begin(),reservoir_space.end(),0)/reservoir_space.size();
+      int mean_degree_space  =accumulate(degree_space.begin(),degree_space.end(),0)/degree_space.size();
+      int mean_edges_checked =accumulate(edges_checked.begin(),edges_checked.end(),0)/edges_checked.size();
+
+      double variance_duration      =variance(times);
+      double variance_total_space   =variance(total_space);
+      double variance_reservoir_space=variance(reservoir_space);
+      double variance_degree_space  =variance(degree_space);
+      double variance_edges_checked =variance(edges_checked);
+
+      outfile<<c<<","<<prop<<","<<mean_duration<<","<<mean_total_space<<","<<mean_reservoir_space<<","<<mean_degree_space<<","<<mean_edges_checked<<","<<variance_duration<<","<<variance_total_space<<","<<variance_reservoir_space<<","<<variance_degree_space<<","<<variance_edges_checked<<","<<successes<<endl; // write values to file
+
     }
-    int mean_duration      =accumulate(times.begin(),times.end(),0)/times.size();
-    int mean_total_space   =accumulate(total_space.begin(),total_space.end(),0)/total_space.size();
-    int mean_reservoir_space=accumulate(reservoir_space.begin(),reservoir_space.end(),0)/reservoir_space.size();
-    int mean_degree_space  =accumulate(degree_space.begin(),degree_space.end(),0)/degree_space.size();
-    int mean_edges_checked =accumulate(edges_checked.begin(),edges_checked.end(),0)/edges_checked.size();
 
-    double variance_duration      =variance(times);
-    double variance_total_space   =variance(total_space);
-    double variance_reservoir_space=variance(reservoir_space);
-    double variance_degree_space  =variance(degree_space);
-    double variance_edges_checked =variance(edges_checked);
-
-    outfile<<c<<","<<mean_duration<<","<<mean_total_space<<","<<mean_reservoir_space<<","<<mean_degree_space<<","<<mean_edges_checked<<","<<variance_duration<<","<<variance_total_space<<","<<variance_reservoir_space<<","<<variance_degree_space<<","<<variance_edges_checked<<","<<successes<<endl; // write values to file
   }
   outfile.close();
 }
 
 // perform reservoir sampling
 // returns number of edges which are read
-int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<vertex>& neighbourhood, vertex& root) {
-  int size=ceil(log10(n)*pow(n,(double)1/c));
+int single_pass_insertion_stream(int c, int d, int n,ifstream& stream, vector<vertex>& neighbourhood, vertex& root, double prop) {
+  int size=ceil(prop*ceil(log10(n)*pow(n,(double)1/c)));
+  int num_samplers=(2>log(n)/5) ? 2 : log(n)/5;
+  num_samplers=c<num_samplers ? c : num_samplers;
+  cout<<"num_samplers="<<num_samplers<<endl;
 
   // initalise edge & vector sets for each parallel run
-  vector<vertex>* reservoirs[c]; vector<edge> edges;
-  for (int i=0; i<c; i++) reservoirs[i]=new vector<vertex>;
-  BYTES+=c*(sizeof(vector<vertex>))+sizeof(vector<edge>);
-  RESERVOIR_BYTES+=c*(sizeof(vector<vertex>))+sizeof(vector<edge>);
+  vector<vertex>* reservoirs[num_samplers]; vector<edge> edges;
+  for (int i=0; i<num_samplers; i++) reservoirs[i]=new vector<vertex>;
+  BYTES+=num_samplers*(sizeof(vector<vertex>))+sizeof(vector<edge>);
+  RESERVOIR_BYTES+=num_samplers*(sizeof(vector<vertex>))+sizeof(vector<edge>);
 
   string line; edge e; map<vertex,int> degrees; // these are shared for each run
   map<vertex,bool*> num_reservoirs;
-  int count[c];  // counts the number of vertexs >=d1
+  int count[num_samplers];  // counts the number of vertexs >=d1
   BYTES+=sizeof(string)+sizeof(edge)+2*sizeof(map<vertex,int>)+sizeof(int);
   DEGREE_BYTES+=sizeof(map<vertex,int>);
 
@@ -194,7 +191,7 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
     }
 
     // update reservoirs
-    for (int j=0; j<c; j++) { // perform parallel runs
+    for (int j=0; j<num_samplers; j++) { // perform parallel runs
       int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
       BYTES+=sizeof(int);
       // NB rest is standard degree-restricted sampling
@@ -202,13 +199,13 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
       // Consider adding first vertex to the reservoir
       if (degrees[e.fst]==d1) {
         count[j]+=1; // increment number of d1 degree vertexs
-        update_reservoir(e.fst,c,j,d1,d2,count[j],size,*reservoirs[j],edges,num_reservoirs); // possibly add value to reservoir
+        update_reservoir(e.fst,num_samplers,j,d1,d2,count[j],size,*reservoirs[j],edges,num_reservoirs); // possibly add value to reservoir
       }
 
       // Consider adding second vertex to the reservoir
       if (degrees[e.snd]==d1) {
         count[j]+=1; // increment number of d1 degree vertexs
-        update_reservoir(e.snd,c,j,d1,d2,count[j],size,*reservoirs[j],edges,num_reservoirs); // possibly add value to reservoir
+        update_reservoir(e.snd,num_samplers,j,d1,d2,count[j],size,*reservoirs[j],edges,num_reservoirs); // possibly add value to reservoir
       }
 
       BYTES-=sizeof(int); // deletion of d1
@@ -219,7 +216,7 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
     // Only variation here is that
     bool inserted=false;
     if (num_reservoirs.find(e.fst)!=num_reservoirs.end()) { // if first endpoint is in reservoir
-      for (int j=0; j<c; j++) {
+      for (int j=0; j<num_samplers; j++) {
         // NOTE inserted==false always at this point
         int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
         if (num_reservoirs[e.fst][j]==true && degrees[e.fst]<=d2+d1) {
@@ -242,7 +239,7 @@ int single_pass_insertion_stream(int c, int d, int n, ifstream& stream, vector<v
         if (inserted) break; // don't check any more reservoirs if it has been inserted (termination won't succeed anyway & stops duplication)
       }
     } else if (num_reservoirs.find(e.snd)!=num_reservoirs.end()) { // if second endpoint is in a reservoir
-      for (int j=0; j<c; j++) {
+      for (int j=0; j<num_samplers; j++) {
         // NOTE inserted==false always at this point
         int d1=max(1,(j*d)/c), d2=d/c; // calculate degree bounds for run
         if (num_reservoirs[e.snd][j]==true && degrees[e.snd]<=d2+d1) {

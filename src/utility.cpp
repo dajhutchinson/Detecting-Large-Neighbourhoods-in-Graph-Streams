@@ -48,10 +48,17 @@ void remove_duplicates(string input_path, string output_path);
  *------*/
 
 int main() {
-  relabel_vertices("../data/facebook.edges","facebook.edges");
-  list_vertices("facebook");
-  generate_insertion_deletion("facebook");
-  list_vertices("facebook_deletion");
+
+  generate_insertion_deletion("gplus");
+  list_vertices("gplus_deletion");
+  
+  string s; int d;
+  greatest_degree("gplus_deletion.edges",s,d);
+  cout<<d<<endl;
+  count_final_edges("gplus_deletion.edges",d);
+  cout<<d<<endl;
+  count_total_edges("gplus_deletion.edges",d);
+  cout<<d<<endl;
 
   return 0;
  }

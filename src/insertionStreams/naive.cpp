@@ -40,11 +40,40 @@ void parse_edge(string str, edge& e);
  *------*/
 
 int main() {
-  int d=5948; int c=20; // d=max_degree,c=accuracy
-  string edge_file_path="../../data/gplus.edges";
-  string output_file_path="../../results/gplus_naive_results.csv";
+  //int d=586, n=747, reps=100; int c=3;
+  //display_results(c,d,n,"../../data/facebook.edges");
 
-  execute_test(2,100,1,d,edge_file_path,output_file_path);
+  string out_file_path="results_naive.csv";
+  int n,d,reps; string edge_file_path;
+
+  // c=runs, d/c=d2, n=# vertices, NOTE - set d=max degree, n=number of vertices
+  //n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
+  //n=102100; d=104947; reps=10; edge_file_path="../../data/gplus_large.edges"; // NOTE - # edges=30,238,035
+  //n=52; d=35; reps=10; edge_file_path="../../data/facebook_small.edges"; // NOTE - # edges=292
+  //n=747; d=586; reps=10; edge_file_path="../../data/facebook.edges"; // NOTE - # edges=60,050
+  //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000star.edges"; // NOTE - # edges=999
+  //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000complete.edges"; // NOTE - # edges=499,500
+  //execute_test(3,20,1,d,edge_file_path,out_file_path);
+
+  n=52; d=35; reps=10; edge_file_path="../../data/facebook_small.edges"; // NOTE - # edges=292
+  out_file_path="0_results_naive_facebook_small.csv";
+  execute_test(3,20,1,d,edge_file_path,out_file_path);
+
+  n=747; d=586; reps=10; edge_file_path="../../data/facebook.edges"; // NOTE - # edges=60,050
+  out_file_path="0_results_naive_facebook.csv";
+  execute_test(3,20,1,d,edge_file_path,out_file_path);
+
+  n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000star.edges"; // NOTE - # edges=999
+  out_file_path="0_results_naive_1000star.csv";
+  execute_test(3,20,1,d,edge_file_path,out_file_path);
+
+  n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000complete.edges"; // NOTE - # edges=499,500
+  out_file_path="0_results_naive_1000complete.csv";
+  execute_test(3,20,1,d,edge_file_path,out_file_path);
+
+  n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
+  out_file_path="0_results_naive_gplus.csv";
+  execute_test(3,20,1,d,edge_file_path,out_file_path);
 
   return -1;
 }
@@ -57,7 +86,7 @@ void execute_test(int c_min, int c_max, int c_step, int d, string in_file, strin
 
   vertex root; set<vertex> neighbourhood;
   for (int c=c_min;c<=c_max;c+=c_step) {
-    cout<<c<<endl;
+    cout<<c<<"/"<<c_max<<" "<<in_file<<" naive"<<endl;
     BYTES=0;
     vertex* p=&root; p=nullptr;
     neighbourhood.clear();
@@ -67,9 +96,11 @@ void execute_test(int c_min, int c_max, int c_step, int d, string in_file, strin
     time_point before=chrono::high_resolution_clock::now();
     int edge_count=naive(in_file,c,d,root,neighbourhood);
     time_point after=chrono::high_resolution_clock::now();
+    cout<<"\r                                                \r";
 
     stream.close();
     auto duration=chrono::duration_cast<chrono::microseconds>(after-before).count();
+    cout<<duration/1000000<<"s"<<endl<<endl;
     if (edge_count!=-1) {
       outfile<<c<<","<<duration<<","<<BYTES<<","<<edge_count<<endl;
     } else {
@@ -89,6 +120,7 @@ int naive(string edge_file_path, int c, int d, vertex& root, set<vertex>& neighb
   BYTES+=sizeof(string)+sizeof(edge)+sizeof(int);
   while (getline(stream,line)) {
     edge_count+=1;
+    if (edge_count%10000==0) cout<<"\r"<<edge_count;
     parse_edge(line,e);
 
     // update degree count & neighbourhoods

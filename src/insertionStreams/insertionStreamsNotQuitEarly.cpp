@@ -71,9 +71,9 @@ int main() {
   //n=1000; d=999; reps=10; edge_file_path="../../data/artifical/1000complete.edges"; // NOTE - # edges=499,500
   //execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
 
-  n=12417; d=5948; reps=10; edge_file_path="../../data/gplus.edges"; // NOTE - # edges=1,179,613
-  out_file_path="results_not_quit_early_gplus.csv";
-  execute_test(3,20,1,reps,d,n,edge_file_path,out_file_path);
+  n=102100; d=104947; reps=1; edge_file_path="../../data/gplus_large.edges"; // NOTE - # edges=30,238,035
+  out_file_path="1_results_initial_implementation_gplus_large.csv";
+  execute_test(2,3,1,reps,d,n,edge_file_path,out_file_path);
 
   return 0;
 }
@@ -111,7 +111,7 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
     successes=0;
     times.clear(); total_space.clear(); reservoir_space.clear(); degree_space.clear(); edges_checked.clear();// reset for new run of c
     for (int i=0;i<reps;i++) {
-      cout<<"("<<i<<"/"<<reps<<") "<<c<<"/"<<c_max<<endl; // output to terminal
+      cout<<"("<<i<<"/"<<reps<<") "<<c<<"/"<<c_max<<" "<<file_name<<" initial implementation"<<endl; // output to terminal
 
       // reset values
       BYTES=0; RESERVOIR_BYTES=0; DEGREE_BYTES=0; MAX_BYTES=0; MAX_RESERVOIR_BYTES=0;
@@ -129,6 +129,7 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
       if (neighbourhood.size()!=0) successes+=1;
 
       auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count(); // time passed
+      cout<<duration/1000000<<"s"<<endl<<endl;
       if (RESERVOIR_BYTES>MAX_RESERVOIR_BYTES) MAX_RESERVOIR_BYTES=RESERVOIR_BYTES;
       times.push_back(duration); total_space.push_back(MAX_BYTES); reservoir_space.push_back(MAX_RESERVOIR_BYTES); degree_space.push_back(DEGREE_BYTES);
     }
