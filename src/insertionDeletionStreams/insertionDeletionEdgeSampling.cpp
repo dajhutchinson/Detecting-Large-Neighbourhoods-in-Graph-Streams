@@ -66,6 +66,7 @@ uint64_t* generate_random_hash(int n, uint64_t m);
 
 // Utility
 uint64_t edge_id(string str, int num_vertices);
+edge unparse_edge_id(uint64_t id, int num_vertices, int edge_value);
 bool edge_type(string str);
 void parse_vertex(string str, vertex& v);
 int identify_endpoint(edge e,vertex target);
@@ -86,10 +87,10 @@ int main() {
   //execute_test(2,20,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
 
   // details of graph to perform on
-  //edge_file_path="../../data/facebook_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=747; d=267; reps=200;
+  //edge_file_path="../../data/facebook_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=747; d=267; reps=10;
   edge_file_path="../../data/facebook_small_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=52; d=33; reps=10;
-  out_file="edge_sampling_results.csv";
-  execute_test(2,100,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
+  out_file="edge_sampled_better_id.csv";
+  execute_test(2,d,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
 
   //set<vertex> neighbourhood; vertex root; // variables for returned values
   //int c=2;
@@ -118,7 +119,7 @@ void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, stri
       single_pass_insertion_deletion_stream(c,d,n,edge_file_path,vertex_file_path,neighbourhood,root);
       time_point after=chrono::high_resolution_clock::now(); // time after execution
 
-      cout<<root<<endl;
+      cout<<endl<<root<<endl;
       cout<<neighbourhood.size()<<"("<<d/c<<")"<<endl<<endl;
 
       if (neighbourhood.size()!=0) successes+=1;
@@ -160,13 +161,13 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
   // calculate model feature
   int x=(num_vertices/(double)c>sqrt(num_vertices)) ? num_vertices/(double)c : sqrt(num_vertices);
   int total_samplers=((num_vertices*d)/((double)c))*(1/((double)x)+1/((double)c))*2*log(num_vertices);
-
+  int possible_edges=ceil(.5*num_vertices*(num_vertices-1));
   cout<<"x:"<<x<<endl<<"Total Samplers:"<<total_samplers<<endl<<"d/c:"<<d/c<<endl;
 
   // prepare samplers
   // sampler parameters
   int s=1/delta; // sparsity to recover at
-  int j=2*log2(num_vertices); // number of s-sparse recoveries to run
+  int j=log2(possible_edges); // number of s-sparse recoveries to run
   int num_cols=2*s;
   int num_rows=log(s/gamma);
 
@@ -181,12 +182,11 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
   // generate unique_hash_map for each sampler
   time_point before=chrono::high_resolution_clock::now(); // time before execution
   uint64_t** unique_hash_maps=(uint64_t**) malloc(total_samplers * sizeof(uint64_t*));
-  uint64_t n6=pow(num_vertices,6);
-  uint64_t n2=pow(num_vertices,2);
-  cout<<"n2="<<n2<<", n6="<<n6<<endl;
+  uint64_t n3=pow(possible_edges,3);
+  cout<<"possible_edges="<<possible_edges<<", n3="<<n3<<endl;
   for (int i=0; i<total_samplers; i++) {
-    if (i%100==0) cout<<"\r"<<i;
-    uint64_t* hash_map=generate_random_hash(n2,n6);
+    if (i%10==0) cout<<"\r"<<i;
+    uint64_t* hash_map=generate_random_hash(possible_edges,n3);
     unique_hash_maps[i]=hash_map;
   }
   time_point after=chrono::high_resolution_clock::now(); // time before execution
@@ -201,7 +201,7 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
 
   // hash limits for each value of j
   uint64_t* hash_lims=new uint64_t[j];
-  for (int i=1; i<=j; i++) hash_lims[i]=n6/pow(2,i);
+  for (int i=1; i<=j; i++) hash_lims[i]=n3/pow(2,i);
 
   int sparsity_estimate=0;
 
@@ -255,33 +255,32 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
   map<vertex, vector<vertex>> neighbourhoods;
   for (set<uint64_t>::iterator it=sampled_ids.begin(); it!=sampled_ids.end(); it++) {
 
-    vertex fst=(*it/num_vertices)+1;
-    vertex snd=(*it%num_vertices)+1;
+    edge e=unparse_edge_id(*it,num_vertices,1);
 
-    if (neighbourhoods.find(fst)==neighbourhoods.end()) {
+    if (neighbourhoods.find(e.fst)==neighbourhoods.end()) {
       vector<vertex> n;
-      n.push_back(snd);
-      neighbourhoods[fst]=n;
-    } else neighbourhoods[fst].push_back(snd);
+      n.push_back(e.snd);
+      neighbourhoods[e.fst]=n;
+    } else neighbourhoods[e.fst].push_back(e.snd);
 
-    if (neighbourhoods[fst].size()>=(int)d/c) { // sufficient neighbourhood found
-      root=fst;
-      for (vector<vertex>::iterator it=neighbourhoods[fst].begin(); it!=neighbourhoods[fst].end(); it++) neighbourhood.insert(*it);
+    if (neighbourhoods[e.fst].size()>=(int)d/c) { // sufficient neighbourhood found
+      root=e.fst;
+      for (vector<vertex>::iterator it=neighbourhoods[e.fst].begin(); it!=neighbourhoods[e.fst].end(); it++) neighbourhood.insert(*it);
       cout<<"NEIGHBOURHOOD OF "<<root<<" ("<<neighbourhood.size()<<")={";
       for (set<vertex>::iterator it=neighbourhood.begin(); it!=neighbourhood.end(); it++) cout<<*it<<",";
       cout<<"\b}";
       return;
     }
 
-    if (neighbourhoods.find(snd)==neighbourhoods.end()) {
+    if (neighbourhoods.find(e.snd)==neighbourhoods.end()) {
       vector<vertex> n;
-      n.push_back(fst);
-      neighbourhoods[snd]=n;
-    } else neighbourhoods[snd].push_back(snd);
+      n.push_back(e.fst);
+      neighbourhoods[e.snd]=n;
+    } else neighbourhoods[e.snd].push_back(e.snd);
 
-    if (neighbourhoods[snd].size()>=(int)d/c) { // sufficient neighbourhood found
-      root=snd;
-      for (vector<vertex>::iterator it=neighbourhoods[snd].begin(); it!=neighbourhoods[snd].end(); it++) neighbourhood.insert(*it);
+    if (neighbourhoods[e.snd].size()>=(int)d/c) { // sufficient neighbourhood found
+      root=e.snd;
+      for (vector<vertex>::iterator it=neighbourhoods[e.snd].begin(); it!=neighbourhoods[e.snd].end(); it++) neighbourhood.insert(*it);
       cout<<"NEIGHBOURHOOD OF "<<root<<" ("<<neighbourhood.size()<<")={";
       for (set<vertex>::iterator it=neighbourhood.begin(); it!=neighbourhood.end(); it++) cout<<*it<<",";
       cout<<"\b}";
@@ -465,12 +464,30 @@ uint64_t edge_id(string str, int num_vertices) {
   try {
     int f=stoi(fst);
     int s=stoi(snd);
-    vertex max = (f>s) ? f : s;
-    vertex min = (f<s) ? f : s;
-    return (uint64_t)((min-1)*num_vertices+(max-1)); // -1 to zero index
+    vertex max = (f>s) ? f-1 : s-1;
+    vertex min = (f<s) ? f-1 : s-1;
+    uint64_t id=(.5*(num_vertices)*(num_vertices-1))-(.5*(num_vertices-max)*(num_vertices-max-1))+min-max-1;
+
+    return id;
   } catch (exception ex) {
+    cout<<"EXCEPETION"<<endl;
     return -1;
   }
+}
+
+edge unparse_edge_id(uint64_t id, int num_vertices, int edge_value) {
+  edge e;
+  e.value=edge_value;
+
+  // i = n - 2 - floor(sqrt(-8*k + 4*n*(n-1)-7)/2.0 - 0.5)
+  int min=num_vertices-2-floor((sqrt((-8*id)+(4*num_vertices*(num_vertices-1))-7)/2.0)-0.5);
+  //j = k + i + 1 - n*(n-1)/2 + (n-i)*((n-i)-1)/2
+  int max=id+min+1-((1/2.0)*num_vertices*(num_vertices-1))+((1/2.0)*(num_vertices-min)*(num_vertices-min-1));
+
+  e.fst=min+1;
+  e.snd=max+1;
+
+  return e;
 }
 
 // identify if insertion (true) or deletion (false)
