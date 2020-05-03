@@ -30,6 +30,7 @@ int P=1073741789; // >2^30
  * DATA STRUCTURES *
  *-----------------*/
 using vertex = int; // typemap vertex
+using time_point=chrono::high_resolution_clock::time_point;
 
 struct edge { // undirected edge
     vertex fst;
@@ -54,7 +55,7 @@ vertex l0sampling(string file_path, vertex target, int num_vertices, double delt
 hash_params* choose_hash_functions(int num_cols, int num_rows);
 void update_s_sparse(vertex endpoint, int edge_value, int num_rows, hash_params* ps_s, long** phi_s, long** iota_s, long** tau_s);
 set<vertex> recover_neighbourhood(int num_cols, int num_rows, long** phi_s, long** iota_s, long** tau_s);
-vertex recover_vertex(set<vertex> neighbourhood, int sparsity, map<int,int> hash_map);
+vertex recover_vertex(set<vertex> neighbourhood, int sparsity, int* hash_map);
 
 // 1-sparse
 bool verify_1_sparse(int phi,int iota,int tau);
@@ -64,7 +65,7 @@ void update_1_sparse_counters(int index,int delta,int row,int col,long** phi_s,l
 hash_params generate_hash(int m);
 int hash_function(int key, hash_params ps);
 // n = num keys, m=possible hash values, hash=map from key to hash value
-void generate_random_hash(int n, int m, map<int,int>& hash);
+int* generate_random_hash(int n, int m);
 
 // Utility
 void parse_edge(string str, edge& e);
@@ -81,34 +82,39 @@ void write_to_file(string outfile_path, map<vertex,int>& edge_count);
 
 int main() {
   // details of graph to perform on
-  string file_path="../../../data/artifical/test_deletion_double.edges";
-  vertex target=779;
-  int num_vertices=1000;
+  string file_path="../../../data/facebook_deletion.edges";
+  vertex target=1;
+  int num_vertices=747;
 
   // constraints on s-sparse recovery
-  double delta=.01; // acceptable failure for L0
-  double gamma=.01; // acceptable failure for s-sparse recovery
+  double delta=0.25; // acceptable failure for L0
+  double gamma=.1; // acceptable failure for s-sparse recovery
 
   // check if edges sampled ~ uniformly
   map<vertex,int> edge_count;
 
   int succ_count=0;
   int num_runs=10000;
+  time_point before=chrono::high_resolution_clock::now(); // time before execution
   for (int run=0; run<num_runs; run++) {
 
     vertex sampled_vertex=l0sampling(file_path,target,num_vertices,delta,gamma);
 
     // output & update results
-    if (sampled_vertex==-1) cout<<run<<",FAIL"<<endl; // recover failed
-    else { // recovery succeed
-      cout<<run<<",SUCCESS("<<sampled_vertex<<")"<<endl;
+    if (sampled_vertex==-1) {
+      if (run%100==0) cout<<"\r"<<run<<",FAIL                     "; // recover failed
+    } else { // recovery succeed
+      if (run%100==0) cout<<"\r"<<run<<",SUCCESS("<<sampled_vertex<<")";
       succ_count+=1;
       if (edge_count.count(sampled_vertex)) edge_count[sampled_vertex]+=1; // update number of sample occurences
       else edge_count[sampled_vertex]=1;
     }
 
   }
+  time_point after=chrono::high_resolution_clock::now(); // time before execution
   cout<<endl<<succ_count<<"/"<<num_runs<<endl;
+  auto duration = chrono::duration_cast<chrono::microseconds>(after-before).count(); // time passed
+  cout<<"DURATION "<<duration/1000000<<"s"<<endl;
 
   write_to_file("uniform_sample_test.csv", edge_count);
 }
@@ -125,8 +131,7 @@ vertex l0sampling(string file_path, vertex target, int num_vertices, double delt
   int num_rows=log(s/gamma);
 
   // generate hash map for each vertex (k-independent)
-  map<int,int> unique_hash_map;
-  generate_random_hash(num_vertices,pow(num_vertices,3),unique_hash_map);
+  int* unique_hash_map=generate_random_hash(num_vertices,pow(num_vertices,3));
 
   // arrays for 1-sparse recovery
   long*** phi_s =initalise_zero_3d_array(j,num_cols,num_rows); // sum of weights (sum ai)
@@ -206,7 +211,7 @@ set<vertex> recover_neighbourhood(int num_cols, int num_rows, long** phi_s, long
 }
 
 // recover vertex from recovered neighbourhood
-vertex recover_vertex(set<vertex> neighbourhood, int sparsity, map<int,int> hash_map) {
+vertex recover_vertex(set<vertex> neighbourhood, int sparsity, int* hash_map) {
   if (neighbourhood.size()>sparsity || neighbourhood.size()==0) return -1; // s-sparse recovery failed
   else { // return vertex in neighbourhood with min hash value
     int min_hash=INT_MAX, min_val=-1;
@@ -270,8 +275,9 @@ int hash_function(int key, hash_params ps) {
 }
 
 // generate random hash with unique values for all keys
-void generate_random_hash(int n, int m, map<int,int>& hash) {
+int* generate_random_hash(int n, int m) {
   vector<int> used; // record hash values which have been used
+  int* hash_map=new int[n+1];
   default_random_engine generator;
   generator.seed(chrono::system_clock::now().time_since_epoch().count()); // seed with current time
   uniform_int_distribution<unsigned long> distribution(0,m);
@@ -280,9 +286,10 @@ void generate_random_hash(int n, int m, map<int,int>& hash) {
     int hash_value=distribution(generator);
     while (find(used.begin(), used.end(), hash_value)!=used.end()) hash_value=distribution(generator);
 
-    hash[i]=hash_value;         // store in hash map
+    hash_map[i]=hash_value;         // store in hash map
     used.push_back(hash_value); // record hash_value as used
   }
+  return hash_map;
 }
 
 /*-----------*
