@@ -54,7 +54,7 @@
 \DontPrintSemicolon
 
 % Title
-\title{Implementing \& Evaluating Space Efficient Algorithms for Detecting Large Neighbourhoods in Graph Streams}
+\title{Implementing and Evaluating Space Efficient Algorithms for Detecting Large Neighbourhoods in Graph Streams}
 \author{Dom Hutchinson}
 \date{\today}
 \maketitle
@@ -77,6 +77,7 @@
 
 \renewcommand\thechapter{\Roman{chapter}}
 \renewcommand\thesection{\thechapter.\roman{section}}
+\renewcommand\thesubsection{\thesection.\roman{subsection}}
 \setcounter{chapter}{1}
 \chapter*{Introduction}
 \addcontentsline{toc}{chapter}{Introduction}
@@ -87,7 +88,15 @@
 %	\item High Degree Detection.
 %	\item Large Neighbourhood Detection.
 %\end{itemize}
-Graphs are used to represent relationships between objects and are popular in data science. A graph stream is a sequence of instructions which describe how to construct a graph. The sequential nature of a graph stream allows it to represent the evolution of a graph over time, which adjacency matrices cannot. This makes graph streams ideal for representing changing networks such as a social or computer network where objects can connect and then disconnect.
+
+%TODO why big data is important
+% The commercial movement towards data science and the desire to find relationships has lead to big data....
+\par The movement towards Big Data has lead to ever larger data sets which traditional offline algorithms cannot work with efficiently due to their high memory-requirements. As the size of data-sets is increasing at a much greater rate than standard RAM capacities means that virtual memory has to be used for these algorithms, significantly increasing their run-times.
+\par The \textit{Data Stream Model} was introduced as a method for coping with these large data sets. In the \textit{Data Stream Model} instructions are received sequentially, as a `stream', and generally random access is not allowed. \textit{Graph Streams} are a common implementation of this model, where instructions describe updates to the edge set of a graph and are typically ordered as a time-series. This allows for a dynamic representation of a graph, which typical \texttt{adjacency list} implementations do not.
+%TODO citation=https://en.wikipedia.org/wiki/Streaming_algorithm#Data_stream_model
+\par Streaming algorithms are a class of algorithms, first formalised in 1996 \cite{TODO}, to work within the \textit{Data Stream Model}. Streaming algorithms are typically designed to work in $polylog(n)$, where $n$ is the number of vertices in the case of graph streams. Streaming algorithms are designed to work in as few passes of the stream as possible, preferable only a single-pass is used as this means the stream can easily be extended without the algorithm having to start over. Due to the limited space streaming algorithms are allocated, they are often produce an approximation of a solution in order to improve space efficiency. When implementing a streaming algorithm the trade-off between accuracy and space-usage needs to be considered.
+
+\par Graphs are used to represent relationships between objects and are popular in data science. A graph stream is a sequence of instructions which describe how to construct a graph. The sequential nature of a graph stream allows it to represent the evolution of a graph over time, which adjacency matrices cannot. This makes graph streams ideal for representing changing networks such as a social or computer network where objects can connect and then disconnect.
 
 \par A basic problem in graph theory is \texttt{High Degree Detection} where you want to find the vertices with the greatest degree. This problem can be trivially and efficiently solved by counting the number of edges incident to each vertex and then returning any vertices of sufficient degree. Solving \texttt{High Degree Detection} allows for the identification of the most influential vertices in a graph, however you cannot make any inferences about the nature of this influence. In a social network it is possible for someone to have lots of followers (\ie be of high degree), but for all these followers to be bot accounts meaning the account actually has zero influence.
 
@@ -95,12 +104,16 @@ Graphs are used to represent relationships between objects and are popular in da
 \textbf{Problem 1} \texttt{Neighbourhood Detection}.\\
 Let $G=(A\cup B,E)$ be a bi-partite graph with vertex sets $A,B$, where $|A|=n$ and $|B|=\text{poly }n$, and edge-set $E$.\\
 In $\texttt{Neighbourhood Detection}(G,d,c)$ we are tasked with outputting a vertex from $A$ with at least $d/c$ of its neighbours in $B$. We can assume that $G$ contains at least one node of degree $d$.\\
-Here $d\in\nats$ is a threshold parameter \& $c\in(0,1]$ is an approximation parameter.
+Here $d\in\nats$ is a threshold parameter and $c>1$ is an approximation parameter.
 }}\end{adjustwidth}\vspace{.3cm}
 
 \par\texttt{Neighbourhood Detection} is the natural set up from \texttt{High Degree Detection}, it tasks you with finding vertices of high degree \underline{and} a subset of their neighbours. Solving \texttt{Neighbourhood Detection} allows for inferences to be made about the influence a vertex has. Extending the social network example, \texttt{Neighbourhood Detection} allows for analysis of the followers of a popular account which can be used for targeted marketing campaigns.
 
-\par\texttt{Neighbourhood Detection} can be solved trivially by storing the neighbourhood of every vertex and then returning any subset of size $\frac{d}c$. This trivial solution is very space inefficient and, with the movement towards Big Data, would quickly overflow a computer's RAM. This results in the use of virtual data which significantly slows down data access time and thus the whole algorithm. This motivates the need for space efficient solutions to \texttt{Neighbourhood Detection}.
+\par\texttt{Neighbourhood Detection} can be solved trivially by storing the neighbourhood of every vertex and then returning any subset of size $\frac{d}c$. But, this solution is space inefficient, requiring $\mathcal{O}(n^2)$ space, and, with the movement towards Big Data, would quickly overflow a computer's RAM. This motivates the need for space efficient solutions to \texttt{Neighbourhood Detection}.
+
+\par In this paper I shall discuss two streaming algorithms which solving \texttt{Neighbourhood Detection} in $polylog(n)$ space. This is achieved by using a series of samplers in order to reduce the set of edges which need to be analysed. This means that there is a possibility of failure and this possibility increases as less edges are sampled, but there is a trade-off here with space efficiency.
+%TODO move this sentence & rewrite
+Using graph streams is good here as it allows for more space efficient algorithms but due to time-ordered nature of most graph streams their is an added difficulty that instructions do not arrive in the most optimal order for solving \texttt{Neighbourhood Detection}.
 
 \section{Motivating Applications} %TODO I don't really like this (partly because it is in list form), moreover it isn't really connected in
 % NOTE maybe it is best that it is fairly separate from the rest so that it can be skipped over.
@@ -110,18 +123,61 @@ Here $d\in\nats$ is a threshold parameter \& $c\in(0,1]$ is an approximation par
 
 There are several real-world applications of \texttt{Neighbourhood Detection} which motivate its investigation. These are situations where simply knowing highly connected elements of a network is not sufficient.
 \begin{itemize}
-	\item[-] Given a list of connections in a social network, identify \textit{social influencers} and determine the demographics of their audience in order to decide who should promote a particular product.
-	\item[-] Given a list of receipts, identify which items are commonly sold together and use this information to determine how to stack shelves in order to increase sales.
-	\item[-] Given a log of traffic within a network identify which resources are being accessed most often, and by whom. This information can be used to determine what upgrades should be made to the network and to identify potential attacks on the network.
+	\item Given a list of connections in a social network, identify \textit{social influencers} and determine the demographics of their audience in order to decide who should promote a particular product.
+	\item Given a list of receipts, identify which items are commonly sold together and use this information to determine how to stack shelves in order to increase sales.
+	\item Given a log of traffic within a network identify which resources are being accessed most often, and by whom. This information can be used to determine what upgrades should be made to the network and to identify potential attacks on the network.
 \end{itemize}
 
 \section{Objectives}
+%TODO expand
 The objectives of this project are to:
 \begin{itemize}
+  \item Understand the problem posed in \cite{orig} and its context in practical situtations.
 	\item Implement and understand the algorithms proposed in \cite{orig}.
+  \item Implement na\"ive algorithms and test their performance against the proposed.
+  \item Show that na\"ive algorithms have a limit to the size of graph they can work on and that it is much lower than for the proposed algorithms.
+  \item Investigate the practicalities of the samplers used in these algorithms.
   \item Discuss and test alterations to the logic and implementation of the proposed algorithms, and the subroutines they rely upon, in order to improve the performance of the proposed algorithm.
+  \item Discuss the trade-offs in practicalities these alterations have, namely between speed and space usage.
 	\item Use large graphs from real-world scenarios to evaluate the practicalities of these implementations on real-world data sets.
+  \item Discuss how graphs from different real-world sources (\ie not social networks) might perform on these implementation and how the implementations could be changed to accomodate for them.
 \end{itemize}
+
+\section{Related Works}
+
+%\begin{itemize}
+%  \item Insertion-Only
+%  \begin{itemize}
+%    \item Counting triangles (ie subgraphs to assess clustering coefficient)
+%    \item Connected Graphs
+%    \item Random Walk
+%  \end{itemize}
+%  \item Insertion-Deletion
+%  \begin{itemize}
+%    \item Linear Sketches
+%    \item Sparsification via sampling
+%    \item $k$-Connecitivty
+%  \end{itemize}
+%\end{itemize}
+
+%TODO provide examples for how they could be used to analyse a graph of social-media connections in order to solidify their relevance
+
+Since the formalisation of the data streaming model in 1996 much research has been done into solving problems using this model. Here I give an overview of previous works in this field.\newline
+
+\par\noindent\textbf{Clustering coefficient}
+\par The clustering coefficient of a graph measures how likely it is that two connected nodes are part of a larger cluster. The equation for this measure is $C=3\times\frac{\text{number of triangles}}{\text{number of wedges}}$ where a triangle any sub-graph which contains three vertices and three edges (\ie any 3-cycles $C_3$ or 3-complete $K_3$ sub-graphs) and a wedge is any sub-graph which contains three vertices and only two edges (\ie any paths of length 2 which are not cycles).
+\par Jha et al. \cite{clusteringCofficient} present a space-efficient single-pass streaming algorithm which approximates the clustering coefficent (and triangle count) in $\mathcal{O}(m/T)$ space where $m$ is the number of edges and $T$ is the number of triangles. Their approach works for undirected insertion-only graph streams and produced relative errors of less than $5\%$.\newline
+
+\par\noindent\textbf{Minimum Distance between two nodes}
+\par A $\alpha$-\textit{spanner} subgraph $H$ of a graph $G=(V,E)$ is a subgraph where $\forall\ u,v\in V$ $d_G(u,v)\leq d_H(u,v)\leq\alpha\cdot d_G(u,v)$ where $d_G(\cdot,\cdot)$ is the length of the shortest path between the given nodes in $G$. Spanners are a space-efficient structure for evaluating the length of shortest path between any two nodes in a graph. A $(2t-1)$-spanner requires at most $\mathcal{O}(n^{1+\frac1t})$ edges need to be stored \cite{edgesOfSpanner}.
+\par Baswana \cite{spanner} presents an single-pass streaming algorithm for unweighted insertion-only graph streams which runs in $\mathcal{O}(m)$ time. This is an amortised run-time of $\mathcal{O}(1)$ per edge, a natural limit for performance.\newline
+
+\par\noindent\textbf{Random walks}
+\par A random walk from $v_0\in V$ in a graph is any random sequence of vertices $v_0,v_1,v_2,\dots$ where $v_i$ is randomly selected from the neighbourhood of $v_{i-1}$. The distribution of $v_t$ can be assessed.
+\par Das Sarma et al. \cite{RandomWalks} present an algorithm for approximating the distribution of $v_t$ in the context of estmating the \textit{PageRank} of a vertex. They present an algorithm which can perform $\frac{n}{l}$ indendepent random walks of length $l$ in $o(n)$ space and $o(l)$ passes. They use this algorithm to sample random walks of different lengths in order to estimate the distribution of $v_t$ and thus estimate \textit{PageRank}.\newline
+
+\par\noindent\textbf{Sketchs}
+\par A sketch of a graph is random linear projection of it. Streaming algoritms which run on sketchs are a popular area of reasearch at the moment as sketchs are of lower dimension than the true graph, reducing the space requirements. In his survey of graph stream algorithms \cite{GraphStreamSurvey} McGregor presents two types of sketch (linear and homomorphic) and discusses how they can be used to assess the connectiveness of a graph. The types of sketchs discussed in the survey are very versitile as they can be generated for both insertion-only and insertion-deletion graphs easily.
 
 \section{Structure}
 Having provide some background to the problem, the structure of this project is as follows. In \texttt{Chapter 1} I discuss and define general ideas, technologies and techniques which are used throughout this project. In \texttt{Chapter 2} I discuss, implement and evaluate the algorithm proposed in \cite{orig} for insertion-only graph streams. In \texttt{Chapter 3} I discuss, implement and evaluate the algorithm proposed in \cite{orig} for insertion-deletion graph streams. And, in \texttt{Chapter 4} review what was achieved in this project and provide some ideas for possible future work to build upon those achievements.
@@ -129,6 +185,7 @@ Having provide some background to the problem, the structure of this project is 
 
 \renewcommand\thechapter{\arabic{chapter}}
 \renewcommand\thesection{\thechapter.\arabic{section}}
+\renewcommand\thesubsection{\thesection.\arabic{subsection}}
 \setcounter{chapter}{0}
 \chapter{Preliminaries}
 
@@ -235,7 +292,7 @@ For the implementations in this project I chose to use C++, specifically \texttt
 %TODO talk about verifying my results
 %TODO typical test = vary c between [3,20]. set d=max degree
 
-During evaluation three performance metrics were measured: success-rate, time-taken, and, space-used. These are all interconnected and come with their own trade-offs. Typically, the changes to space-used \& time-taken when different strategies are implemented occur in the same direction, but at different rates. During most tests the success-rate was near perfect, but the other metrics were significantly higher as it took longer for a solution to be found.
+During evaluation three performance metrics were measured: success-rate, time-taken, and, space-used. These are all interconnected and come with their own trade-offs. Typically, the changes to space-used and time-taken when different strategies are implemented occur in the same direction, but at different rates. During most tests the success-rate was near perfect, but the other metrics were significantly higher as it took longer for a solution to be found.
 
 \par In real world scenarios we are most interested analysing the neighbourhoods of the most influential vertices. For this reason $d$ is set to the maximum degree in the graph during all tests. Further, the greater the proportion of a neighbourhood returned the better the inferences made are so I focussed testing on low values of $c$, namely $c\in[1,20]$.
 
@@ -265,9 +322,9 @@ During evaluation three performance metrics were measured: success-rate, time-ta
 
 \section{Degree-Based Reservoir Sampling}
 
-\texttt{Degree-Based Reservoir Sampling} is a technique for uniformly sampling a vertex from the set of vertices whose degrees are greater than a specified minimum bound $d_1$ along with $d_2$ of its neighbours. This is achieved by maintaining a sample of this set of vertices, known as the \textit{reservoir}, and storing the first $d_2$ of the edges incident to a vertex after it is sampled. The size of the reservoir is a parameter of the algorithm. \textbf{Algorithm 1} outlines pseudocode for performing \texttt{Degree-Based Reservoir Sampling} on a bipartite graph using an insertion-only graph stream.
+\texttt{Degree-Based Reservoir Sampling} is a technique for uniformly sampling a vertex from the set of vertices whose degrees are greater than a specified minimum bound $d_1$ along with $d_2$ of its neighbours. The sampler maintains a subset of the vertices of degree $d_1$, known as the \textit{reservoir} \cite{degResSampling}, and stores the first $d_2$ of the edges incident to a vertex after it is added to the reservoir. The size of this reservoir is a parameter of the algorithm. \textbf{Algorithm 1} outlines pseudocode for performing \texttt{Degree-Based Reservoir Sampling} on a bipartite graph using an insertion-only graph stream.
 
-\begin{algorithm}
+\begin{algorithm}[H]
 	\caption{\texttt{Degree-Based Reservoir Sampling}$(d_1,d_2,s)$}
 	\SetKwInOut{Require}{require}
 	\Require{Degree bound $d_1\in\nats$, Neighbourhood bound $d_2\in\nats$, Reservoir size $s\in\nats$, Insertion-only stream $\{(a_0,b_0),\dots,(a_n,b_n)\}$}
@@ -297,22 +354,22 @@ During evaluation three performance metrics were measured: success-rate, time-ta
 		}
 	}
 	\If{$\exists\ a\in R$ with $D[a]\geq d_1+d_2-1$} {
-		\Return{Uniform random vertex \& neighbourhood from those of size $d_2$}
+		\Return{Uniform random vertex and neighbourhood from those of size $d_2$}
 	} \lElse { \Return{\texttt{FAIL}}}
 \end{algorithm}
 
-\par Three data stores are used in \texttt{Degree-Based Reservoir Sampling}: a map of the degree of every node in the graph $D$; a set for the reservoir $R$; and a set for edges incident to the vertices in the reservoir $E$.
+\par Three data stores are used in \texttt{Degree-Based Reservoir Sampling}: a \texttt{map} of the degree of every node in the graph $D$; a \texttt{set} for the reservoir $R$; and a \texttt{set} for edges incident to the vertices in the reservoir $E$.
 
-\par The reservoir has an invariant that at any point in time it contains a uniform sample of the vertices whose degrees are known to be greater than $d_1$. This invariant is proved as \textbf{Lemma 2.1}, first I shall describe how the reservoir is maintained by controlling how vertices are inserted. The first time the degree counter for a vertex $v$ surpasses $d_1$, $v$ is considered for insertion into the \textit{reservoir}. There are two cases
+\par The reservoir $R$ has an invariant that at any point in time it contains a uniform sample of the vertices whose degrees are known to be greater than $d_1$. This invariant is proved as \textbf{Lemma 2.1}, first I shall describe how the reservoir is maintained by controlling how vertices are inserted. The first time the degree counter for a vertex $v$ surpasses $d_1$, $v$ is considered for insertion into the \textit{reservoir}. There are two cases
 \begin{itemize}
 	\item If the reservoir is \underline{not} full (\ie $|R|<s$) then $v$ is inserted into the reservoir.
-	\item Otherwise, if the reservoir is already full, a Bernoulli random variable with probability $p=\frac{x}s$ is used, where $x$ is the number of vertices known to have degree at least $d_1$. If this random variable succeeds then pick, uniformly at random, a vertex $u$ currently in the reservoir and replace it with $v$. All the edges in $E$ which are incident to $u$, and no other vertex in the reservoir, are removed from $E$.
+	\item Otherwise, a Bernoulli random variable with probability $p=\frac{x}s$ is used, where $x$ is the number of vertices known to have degree at least $d_1$. If this random variable succeeds then pick, uniformly at random, a vertex $u$ currently in the reservoir and replace it with $v$. All the edges in $E$ which are incident to $u$, and no other vertex in the reservoir, are removed from $E$.
 \end{itemize}
 
 Whenever an edge $(u,v)$ is encountered and $u$ is in the reservoir and the number of edges stored in $E$ incident to $u$ is less than $d_2$ then $(u,v)$ is inserted into $(u,v)$. %TODO rewrite this
 \begin{adjustwidth}{.3cm}{}\fbox{\parbox{\textwidth}{
 
-\textbf{Lemma 2.1} At any time $t$, $R$ contains a uniform sample of the vertices whose degrees are known to be at least $d_1$.\\
+\textbf{Lemma 2.1} At time $t$, $R$ contains a uniform sample of the vertices whose degrees are known to be at least $d_1$.\\
 
 \textit{Proof (by induction)}\\
 Let $X_t$ be the set of vertices whose degrees are know to be greater than $d_1$ after $t$ instructions have been consumed and $x_t:=|X_t|$.\\
@@ -326,9 +383,9 @@ Hence by mathematical induction, $R$ contains a uniform sample of the vertices o
 }}\end{adjustwidth}\vspace{.3cm}
 %TODO adding termination condition? Maybe add during implementation
 
-\par If $v$ is not added to the reservoir at this time, it never will be in the future. Note that in the case that the reservoir is full and $v$ is inserted into it, $v$ is replacing an element that was in the reservoir meaning any progress made towards finding a neighbourhood for that vertex is annulled. The amount of progress is not taken into account \& thus if there is a high turn-over of elements in a reservoir then less progress is made towards finding a neighbourhood for each of them. This is discussed further during evaluation.
+\par If $v$ is not added to the reservoir at this time, it never will be in the future. Note that in the case that the reservoir is full and $v$ is inserted into it, $v$ is replacing an element that was in the reservoir meaning any progress made towards finding a neighbourhood for that vertex is annulled. The amount of progress is not taken into account and thus if there is a high turn-over of elements in a reservoir then less progress is made towards finding a neighbourhood for each of them. This is discussed further during evaluation.
 
-\par \texttt{Degree-Based Reservoir Sampling} only works on insertion-only streams as it does not account for when the degree of a vertex falls below the threshold, after being sampled. This means the reservoir is not necessarily a uniform random sample of the vertices with degree $\geq d_1$. %TODO is this sufficient
+\par \texttt{Degree-Based Reservoir Sampling} only works on insertion-only streams as it does not account for when the degree of a vertex falls below the threshold, after being sampled. This means the reservoir may contain vertices whose degree is less than $d_1$.
 
 \par For this project we are interested in how \texttt{Degree-Based Reservoir Sampling} can be implemented for bipartite graphs, specifically we want to sample from the $A$-vertices of the graph. For a bi-partite graph with $n$ $A$-vertices \texttt{Degree-Based Reservoir Sampling} requires $\mathcal{O}(n\log n+sd_2\log n)$ space, assuming $O(\log n)$ space is required to store an edge or a vertex, since it stores a degree counter for every $A$-vertex and at most $d_2$ edges for each of the $s$ vertices in the reservoir.
 
@@ -344,9 +401,7 @@ Hence by mathematical induction, $R$ contains a uniform sample of the vertices o
 %	\item Theoretical space requirements
 %\end{itemize}
 
-The \texttt{Neighbourhood-Detection Problem} can be solved using \texttt{degree-based reservoir sampling} sampling by setting $d_2=\frac{d}c$. The question remains as to what to set $d_1$ and $s$ to in order to achieve a high probability of success. %in little time and space
-
-\par \textbf{Algorithm 2} is the algorithm proposed in \cite{orig} for solving the \texttt{Neighbourhood-Detection Problem} for insertion-only streams.
+\texttt{Neighbourhood Detection} can be solved using \texttt{degree-based reservoir sampling} by setting $d_2=\frac{d}c$. The question remains as to what to set $d_1$ and $s$ to in order to achieve a high probability of success. \textbf{Algorithm 2} is the space-efficient algorithm proposed in \cite{orig} for solving \texttt{Neighbourhood-Detection} for insertion-only streams.
 
 \begin{algorithm}
 	\caption{One-pass $c$-Approximation Insertion-Only Streaming Algorithm for $\mathtt{Neighbourhood\ Detection}$}
@@ -359,15 +414,14 @@ The \texttt{Neighbourhood-Detection Problem} can be solved using \texttt{degree-
 	\Return{\small Uniform random neighbourhood $(a_i,S_i)$ \text{from successful runs}}
 \end{algorithm}
 
-\par In \cite{orig} it is proven that setting $s=\lceil\ln(n)\cdot n^{\frac1c}\rceil$ and using $c$ \texttt{degree-based reservoir samplers} each with a different lower bound, incremented from $\frac{d}c$ to $d$ stepping by $\frac{d}c$ each time, results in a high probability of success. The samplers are run in parallel so that the algorithm only requires a single pass of the stream. Implementing parallel running of the samplers just requires passing the same instruction to each sample before fetching the next instruction.
+\par In \cite{orig} it is proven that setting $s=\left\lceil\ln(n)\cdot n^{\frac1c}\right\rceil$ and using $c$ \texttt{degree-based reservoir samplers} each with a different lower bound, incremented from $\frac{d}c$ to $d$ stepping by $\frac{d}c$ each time, results in a high probability of success. The samplers are run in parallel so that the algorithm only requires a single pass of the stream. Implementing parallel running of the samplers just requires passing the same instruction to each sample before fetching the next instruction.
 
-\par Each of the $c$ samplers requires $\mathcal{O}(n\log n+sd_2\log n)$ space. Since the degree map can be shared between samplers the total space is $\mathcal{O}(n\log n+c\cdot sd_2\log n)=\mathcal{O}(n\log n+c\lceil\log(n)n^{\frac1c}\rceil\frac{d}c\log n)=\mathcal{O}(n\log n+n^{\frac1c}d\log^2n)$. The proposed algorithm does require you to know the number of vertices in the graph stream before running the algorithm, or at least the $\log$ of it. If this is unknown then it is quick to run through the whole stream \& build a set of vertices in the graph. This requires $\mathcal{O}(n\log n)$ space, assuming $O(\log n)$ space is required to store a vertex. However, in many real-world scenarios this number (or a good approximation) will be known due to it being important for other tasks.
+\par Each of the $c$ samplers requires $\mathcal{O}(n\log n+sd_2\log n)$ space. Since the degree map can be shared between samplers the total space is $\mathcal{O}(n\log n+c\cdot sd_2\log n)=\mathcal{O}(n\log n+n^{\frac1c}d\log^2n)$. The proposed algorithm does require you to know the number of vertices in the graph stream before running the algorithm, or at least the $\log$ of it. If this is unknown then it is quick to run through the whole stream and build a set of vertices in the graph. This requires $\mathcal{O}(n\log n)$ space, assuming $O(\log n)$ space is required to store a vertex. However, in many real-world scenarios this number (or a good approximation) will be known due to it being important for other tasks.
 
 \section{Implementation}
-%TODO justify changes wrt gplus graph only, include plots as I go
-\par I centred my implementation around working for the graph streams from \textit{SNAP} \cite{SNAP} as they came from real-world sources \& thus are very important for testing the real-world practicalities of the proposed algorithm. These graph streams are not formatted in a strictly bipartite way. I adjusted \texttt{degree-based reservoir sampling} to account for this by by repeating \texttt{lines 6-17} (and the early termination clause) of \textbf{Algorithm 1} after the end of the \texttt{for} loop, with all occurrences of $a_i$ replaced by $b_i$.
-%TODO something about implementing in parallel. Nah
-\par I tested changes to the implementation on multiple graphs, for brevity and succinctness I shall only show the results for \texttt{gplus}. \texttt{Figure 2.3.1} shows the results of testing the initial implementation of \textbf{Algorithm 2}. These results shows that the space requirements of \textbf{Algorithm 2} are significantly less than the size of file stream and that the space requirements decrease as the approximation factor increases but there is an undesirable result that the time taken increases as the approximation factor increases.
+
+\par The graphs from \cite{SNAP} are not formatted in a strictly bipartite way. I adjusted \texttt{degree-based reservoir sampling} to account for this by repeating \texttt{lines 6-17} (and the early termination clause) of \textbf{Algorithm 1} after the end of the \texttt{for} loop, with all occurrences of $a_i$ replaced by $b_i$.
+
 \begin{figure}[H]
 	\label{Figure 2}
 	\includegraphics[width=.5\textwidth]{img/gplusInitialTime.png}
@@ -376,11 +430,15 @@ The \texttt{Neighbourhood-Detection Problem} can be solved using \texttt{degree-
 	%"Final Evaluation - insertion-only"/Master
 \end{figure}
 
-\noindent After this initial implementation I considered two alterations which could be made:
+\par During this section I tested changes to the implementation on multiple graphs, for brevity and succinctness I shall only show the results for \texttt{gplus}. \texttt{Figure 2.3.1} shows the results of testing the initial implementation of \textbf{Algorithm 2}. These results shows that the space requirements of \textbf{Algorithm 2} are significantly less than the size of file stream and that the space requirements decrease as the approximation factor increases but there is an undesirable result that the time taken increases as the approximation factor increases.
+
+\par After this initial implementation I considered two alterations to the implementation:
 \begin{enumerate}
 	\item \textit{Early Termination} - Returning the first neighbourhood of sufficient size, rather than uniformly sample from all which succeed; and,
 	\item \textit{Shared Edge-Set} - Having all samplers share an edge-set, rather than each have one each.
 \end{enumerate}
+
+\subsection{Early Termination}
 
 \textbf{Algorithm 1} states that the whole stream should be run through before the sampler returns a result uniformly from those which succeeded. This is unnecessary to fulfil \texttt{neighbourhood detection} as returning the first successful result would be sufficient. Similarly \textbf{Algorithm 2} states that all samplers should be run to completion and then a result is returned from those which succeeded. Again, this is unnecessary as return the first encountered neighbourhood of sufficient size would suffice for solving \texttt{neighbourhood detection}. These early terminations can be implemented by terminating the algorithm after it finds a vertex of degree $d_1+d_2-1$ which is in a reservoir (remembering that $d_1$ is different for each reservoir).
 
@@ -394,23 +452,25 @@ The \texttt{Neighbourhood-Detection Problem} can be solved using \texttt{degree-
 	%"Final Evaluation - insertion-only"/Master
 \end{figure}
 
-\par \texttt{Figure 2.3.2} shows the results implementing early termination, against not implementing it, for graph \texttt{gplus} at different approximation factors. The time taken now decreases as $c$ increases and is more than halved in all cases. The space-requirements are down in every case and are down more than $90\%$ for reasonable values of $c$. Both metrics now converge quickly, to $\smallsim\!\!1\frac1.5$ seconds and $3.3$MBs respectively, meaning we can make predictions on the performance of the algorithm for greater values of $c$. These are really good results, so I implemented this change going forward. %TODO explain reasons behind these results
+\par \texttt{Figure 2.3.2} shows the results implementing early termination, against not implementing it, for graph \texttt{gplus} at different approximation factors. The time taken now decreases as $c$ increases and is more than halved in all cases. The space-requirements are down in every case and are down more than $90\%$ for reasonable values of $c$. Both metrics now converge quickly, to $\smallsim\!\!1.5$ seconds and $3.3$MBs respectively, meaning we can make predictions on the performance of the algorithm for greater values of $c$. These are really good results, so I implemented this change going forward. %TODO explain reasons behind these results
 %NOTE space converged to is that used by degree map
 %TODO comment about effect on space used by reservoirs vs degree map
 %TODO this change means that time taken is now a measure of success as failure is (basically) the only time the whole stream is run through
+
+\subsection{Shared Edge-Set}
 
 \vspace{.3cm}\begin{adjustwidth}{.3cm}{}\fbox{\parbox{\textwidth}{
 
 \textbf{Lemma 2.2} If \textbf{Algorithm 2} terminates after the first sufficient neighbourhood it finds, no vertex occurs in multiple reservoirs at the same time.\\
 
 % TODO a proof by contradiction
-\textit{Proof (by contradiction)} Let $v$ be a vertex in the graph stream. Suppose, without loss of generality, that $v$ is a member of the reservoirs of both \texttt{Deg-Res-Sampling}$(\frac{d}{c},\frac{d}{c},s)$ \& \texttt{Deg-Res-Sampling}$(\frac{2d}{c},\frac{d}{c},s)$. This means that $v$ was sampled twice, after encountering the $\frac{d}c^\text{th}$ \underline{and} $\frac{2d}c^\text{th}$ edge incident to $v$ in the stream. After sampling $v$ for the first time, encountered edges which are incident to $v$ are stored. This means that by the time $v$ is sampled for the second time $\frac{2d}c-\frac{d}c=\frac{d}c$ edges incident to $v$ have been stored. This is a sufficient neighbourhood for \textbf{Algorithm 2} to terminate. This is a contradiction since termination occurs before the second sampling occurs.$\hfill\square$
+\textit{Proof (by contradiction)} Let $v$ be a vertex in the graph stream. Suppose, without loss of generality, that $v$ is a member of the reservoirs of both \texttt{Deg-Res-Sampling}$(\frac{d}{c},\frac{d}{c},s)$ and \texttt{Deg-Res-Sampling}$(\frac{2d}{c},\frac{d}{c},s)$. This means that $v$ was sampled twice, after encountering the $\frac{d}c^\text{th}$ \underline{and} $\frac{2d}c^\text{th}$ edge incident to $v$ in the stream. After sampling $v$ for the first time, encountered edges which are incident to $v$ are stored. This means that by the time $v$ is sampled for the second time $\frac{2d}c-\frac{d}c=\frac{d}c$ edges incident to $v$ have been stored. This is a sufficient neighbourhood for \textbf{Algorithm 2} to terminate. This is a contradiction since termination occurs before the second sampling occurs.$\hfill\square$
 
 }}\end{adjustwidth}\vspace{.3cm} %TODO refine
 
 \par A consequence of \textbf{Lemma 2.2} is that an edge is only stored in multiple edge sets if its endpoints are sampled by different samplers. %TODO mention this is rare
 This means that introducing a shared edge-set for all samplers will have little effect on the space requirements of \texttt{Algorithm 2}.
-\par However, the alterations to the implementation which would have to made to allow for a shared edge-set could introduce time savings. Namely, I would need a data-structure which tells me \underline{precisely} which reservoir each vertex is in that so I know the appropriate value of $d_1$ in \texttt{Algorithm 1:Line 18}, otherwise improper termination could occur. An appropriate data-structure for this would be a \texttt{map} from each vertex to a bitstring whose indices indicate whether the vertex lies in an associated reservoir. With this implementation, inserting or deleting a vertex to/from a reservoir and querying whether a vertex is in a given reservoir becomes querying a map \& then a known bit in a bitstring which both take $\mathcal{O}(1)$ time. This \texttt{map} replaces the \texttt{ordered set}s currently used to store the reservoirs of each sampler and thus reduce these action times from $O(\log n)$ to $\mathcal{O}(1)$ time. As these actions occur a lot this change should result in a reasonable reduction in run-time. % TODO something about space used to store a vertex in the map vs in sets
+\par However, the alterations to the implementation, which would have to made to allow for a shared edge-set, could introduce time savings. Namely, a data-structure is required to store \underline{precisely} which reservoir each vertex is in so that the appropriate value of $d_1$ is used in \texttt{Algorithm 1:Line 18}, otherwise improper termination could occur. An appropriate data-structure for this would be a \texttt{map} from each vertex to a bitstring whose indices indicate whether the vertex lies in an associated reservoir. With this implementation, inserting or deleting a vertex to/from a reservoir and querying whether a vertex is in a given reservoir is achieved with a single query of a \texttt{map} and then a known bit in a bitstring which both take $\mathcal{O}(1)$ time. This \texttt{map} replaces the \texttt{ordered set}s currently used to store the reservoirs of each sampler and thus reduces these action times from $O(\log n)$ to $\mathcal{O}(1)$ time. As these actions occur a lot this change should result in a reasonable reduction in run-time. % TODO something about space used to store a vertex in the map vs in sets
 
 \begin{figure}[H]
 	\label{Figure 4}
@@ -420,7 +480,7 @@ This means that introducing a shared edge-set for all samplers will have little 
 	%"Final Evaluation - insertion-only"/Master
 \end{figure}
 
-\par \texttt{Figure 2.3.3} shows the results when implementing both early termination and a shared edge set, against only using early terminiation. These tests showed a consistent reduction in run-time when both strategies are used. there is a slight increase in space usage for low values of $c$ but this difference disappears very quickly so is of little concern. Implementing a shared-edge set does not change the logic of the algorithm so does not affect its success rate. Due to the reduction in mean run-time \& no noteworthy changes in space requirements, I recommend implementing this change.
+\par \texttt{Figure 2.3.3} shows the results when implementing both early termination and a shared edge set, against only using early terminiation. These tests showed a consistent reduction in run-time when both strategies are used. there is a slight increase in space usage for low values of $c$ but this difference disappears very quickly so is of little concern. Implementing a shared-edge set does not change the logic of the algorithm so does not affect its success rate. Due to the reduction in mean run-time and no noteworthy changes in space requirements, I recommend implementing this change.
 
 %TODO discuss performance against theory
 \section{Parameter Tuning}
@@ -430,22 +490,16 @@ This means that introducing a shared edge-set for all samplers will have little 
 %	\item Full optimised against v Naïve.
 %\end{itemize}
 
-\par The changes discussed above have been to the technical implementation of the proposed algorithm, rather than to the its logic. This means these changes have had no affect on the success rate of the algorithm. I will now discuss potential changes to the logic of the proposed algorithm. These changes will affect on the success rate of the algorithm. It is possible that no change in the success-rate will be seen \& rather the change will occur in execution time as more instructions have to be read before a solution is found. I am investigating the practicalities of the algorithm so keeping the run-times usable is a high priority. In \texttt{Algorithm 2} there are two parameters which can be played around with: the number of samplers; and, the size of the reservoirs, $s$.
+\par The changes discussed in \textbf{Section 2.4} have been to the technical implementation of \textbf{Algorithm 2}, rather than to the its logic. This means these changes have had no affect on the success rate of the algorithm. I will now discuss potential changes to the logic of the proposed algorithm. These changes will affect the success rate of the algorithm. As I am investigating the practicalities of the algorithm keeping the run-times usable is a high priority. In \textbf{Algorithm 2} there are two parameters to scrutinise: the number of samplers; and, the size of the reservoirs $s$.
 
-\par The total reservoir size, $\left\lceil\ln(n)n^{\frac1c}\right\rceil\times\text{\#\ Samplers}$, is the main factor effecting the space-used by the algorithm as this is the number of vertices it needs to store edges for. Noting that \texttt{Algorithm 2} sets the number of samplers to be $c$ and that $cp\left\lceil\ln(n)n^{\frac1c}\right\rceil\leq c\left\lceil p\ln(n)n^{\frac1c}\right\rceil\ \forall\ p\in[0,1]$ it is apparent that reducing the number of samplers has a greater effect on total reservoir size, and thus space-used, than reducing reservoir size by the same proportion. For this reason I investigated the number of samplers first.
+\par The total reservoir size, $\left\lceil\ln(n)n^{\frac1c}\right\rceil\times\text{\#\ Samplers}$, is the main factor affecting the space-used by the algorithm as this is the number of vertices it needs to store edges for. Noting that \textbf{Algorithm 2} sets the number of samplers to be $c$ and that $cp\left\lceil\ln(n)n^{\frac1c}\right\rceil\leq c\left\lceil p\ln(n)n^{\frac1c}\right\rceil\ \forall\ p\in[0,1]$ it is apparent that reducing the number of samplers has a greater effect on total reservoir size, and thus space-used, than reducing reservoir size by the same proportion. For this reason I investigated the number of samplers first.
 
 \subsection{Number of Samplers}
 
-\par When changing the number of samplers we need to consider their lower bounds, $d_1$, too. If the range of vertex degrees which individual samplers sample, $[d_1,d_1+d_2]$, at overlap then duplicate sampling of vertices can occur which offers no advantages \& leads to a reservoir space being wasted. And, if there are gaps between these ranges then there are vertices which may not be sampled. %TODO flesh this out more.
-Thus, the best set up is to have the sampling ranges be sequential with no gaps and so when varying the number of samplers we should only add or remove from the endpoints of these ranges. The samplers with lower lower-bounds, $d_1$, start sampling earlier \& from a larger pool. I expect these early samplers to be more important wrt performance gains, than later samplers. It is not necessarily true that the first sampler is the most important as it is sampling from the largest pool and so has the greatest turn-over rate in its reservoir.
+\par When changing the number of samplers we need to consider their lower bounds $d_1$ too. If the range of vertex degrees $[d_1,d_1+d_2]$ which individual samplers sample at overlap then duplicate sampling of vertices can occur which offers no advantages and leads to a reservoir space being wasted. And, if there are gaps between these ranges then there are vertices which may not be sampled. %TODO flesh this out more.
+Thus, the best set up is to have the sampling ranges be sequential with no gaps and so when varying the number of samplers we should only add or remove from the endpoints of these ranges.
 
-\par I ran the following tests to investigate what had a greater effect on performance, removing later samplers or earlier samplers.
-\begin{enumerate}
-	\item Removing the \underline{first} $x$ samplers from \texttt{Algorithm 2} for $x\in[1,c)$, for $c\in[1,20]$.\\
-	\textit{i.e.} Change the \texttt{for} loop in \texttt{Algorithm 2:Line 2} to run for $i\in[x,c-1]$.
-	\item Removing the \underline{last} $x$ samplers from \texttt{Algorithm 2} for $x\in[1,c)$, for $c\in[1,20]$.\\
-	\textit{i.e.} Change the \texttt{for} loop in \texttt{Algorithm 2:Line 2} to run for $i\in[0,c-x]$.
-\end{enumerate}
+\par The samplers with lower lower-bounds $d_1$ start sampling earlier and from a larger pool. I expect these early samplers to be more important wrt performance gains, than later samplers. It is not necessarily true that the first sampler is the most important as it is sampling from the largest pool and so has the greatest turn-over rate in its reservoir.
 
 \begin{figure}[H]
 	\label{Figure 5}
@@ -455,7 +509,15 @@ Thus, the best set up is to have the sampling ranges be sequential with no gaps 
 	%"Final Evaluation - insertion-only"/Master
 \end{figure}
 
-\par \texttt{Figure 2.4.4} shows the results of tests, with the results normalised to make them comparable. These results confirm the hypothesis that the lower a sampler's lower-bound is, the greater the effect of its inclusion on performance. Time-taken increased as more early samplers were removed, and decreased as more late samplers were removed. The space used was not affected much by the removal of samplers, although there is a slight increase in space usage when more early samplers were removed. Comparing the normalised results shows that removing early samplers is more detrimental to performance than including late samplers. This is due to late samplers only starting to sample later \& they may not have begun sampling by the time one of the previous samplers has succeed, terminating the algorithm. When the same proportion of samplers were removed for different values of the  $c$, the relative performance was worse for greater values of $c$. This is to be expected as the real number of samplers removed increases with $c$.
+\par Two tests where run to investigate what had a greater effect on performance, removing later samplers or earlier samplers.
+\begin{enumerate}
+	\item Removing the \underline{first} $x$ samplers from \texttt{Algorithm 2} for $x\in[1,c)$, for $c\in[1,20]$.\\
+	\textit{i.e.} Change the \texttt{for} loop in \texttt{Algorithm 2:Line 2} to run for $i\in[x,c-1]$.
+	\item Removing the \underline{last} $x$ samplers from \texttt{Algorithm 2} for $x\in[1,c)$, for $c\in[1,20]$.\\
+	\textit{i.e.} Change the \texttt{for} loop in \texttt{Algorithm 2:Line 2} to run for $i\in[0,c-x]$.
+\end{enumerate}
+
+\par \texttt{Figure 2.4.4} shows the results of these tests, with the results normalised to make them comparable. These results confirm the hypothesis that the lower a sampler's lower-bound is, the greater the effect of its inclusion on performance. Time-taken increased as more early samplers were removed, and decreased as more late samplers were removed. The space used was not affected much by the removal of samplers, although there is a slight increase in space usage when more early samplers were removed. Comparing the normalised results shows that removing early samplers is more detrimental to performance than including late samplers. This is due to late samplers only starting to sample later and they may not have begun sampling by the time one of the previous samplers has succeed, terminating the algorithm. When the same proportion of samplers were removed for different values of the  $c$, the relative performance was worse for greater values of $c$. This is to be expected as the real number of samplers removed increases with $c$.
 
 \begin{figure}[H]
 	\label{Figure 6}
@@ -473,7 +535,7 @@ Thus, the best set up is to have the sampling ranges be sequential with no gaps 
 	\label{Figure 7}
 	\subfloat[Time Taken]{{\includegraphics[width=.5\textwidth]{img/gplusRemovedSamplersTime.png}}}
 	\subfloat[Space Used]{{\includegraphics[width=.5\textwidth]{img/gplusRemovedSamplersSpace.png}}}
-	\caption{Results when using a reduced number of samplers and the technical improvements, tested on \texttt{gplus} graph for different approximation factors, against just using the technical improvements.}
+	\caption{Results when using a reduced number of samplers for different approximation factors, against just using the technical improvements. Results from graph \texttt{gplus}}
 	%"Final Evaluation - insertion-only"/Master
 \end{figure}
 
@@ -507,7 +569,7 @@ Thus, the best set up is to have the sampling ranges be sequential with no gaps 
 	\For{$i\in[0,n_s]$\text{\textbf{ in parallel}}} {
 		$(a_i,S_i)\leftarrow\mathtt{Deg}\mbox{-}\mathtt{Res}\mbox{-}\mathtt{Sampling}\left(\max\left\{1,i\cdot\frac{d}{c}\right\},\frac{d}c,s\right)$
 	}
-	\Return{\small Uniform random neighbourhood $(a_i,S_i)$ \text{from successful runs}}
+	\Return{\small First neighbourhood of sufficient degree and its root}
 \end{algorithm}
 
 %TODO rewrite algorithm 2 with these parameter optimisations
@@ -522,7 +584,6 @@ Thus, the best set up is to have the sampling ranges be sequential with no gaps 
 %\end{itemize}
 % Compare max space to size of edges file
 % Identify which change had what effect (to space, time, success)
-%TODO 1000star is useful as there is only one valid solution
 
 \begin{algorithm}
 	\caption{Na\"ive Single-Pass Insertion-Only Streaming Algorithm for Neighbourhood Detection}
@@ -545,16 +606,17 @@ Thus, the best set up is to have the sampling ranges be sequential with no gaps 
 To evaluate my final implementation I compared its performance to that of different stages of the optimisation and to the naïve implementation given in \textbf{Algorithm 4}. These different stages were
 \begin{enumerate}[label=\roman*)]
 	\item Initial Implementation - No early termination, shared edge-set or sampler removal. %insertionStreamsNotQuitEarly
-	\item After Technical Optimisation - Implements early termination \& a shared edge-set. %insertionStreamsSharedEdgeSet
+	\item After Technical Optimisation - Implements early termination and a shared edge-set. %insertionStreamsSharedEdgeSet
 	\item After Algorithmic Optimisation - Implements early termination, shared edge-set and sampler removal. %insertionStreamsRemovedSamplers
 \end{enumerate}
 
-% TODO a table of results??
 \begin{figure}[H]
 	\label{Figure 12}
-	\subfloat[Time Taken]{{\includegraphics[width=.5\textwidth]{img/insertionOnlyGplusTime.png}}}
-	\subfloat[Space Used]{{\includegraphics[width=.5\textwidth]{img/insertionOnlyGplusSpace.png}}}
-	\caption{Time taken and space used by different implementations of the proposed algorithm for insertion-only streams when tested on \texttt{gplus}}
+	\subfloat[\texttt{gplus} - Time Taken]{{\includegraphics[width=.5\textwidth]{img/insertionOnlyGplusTime.png}}}
+	\subfloat[\texttt{gplus} - Space Used]{{\includegraphics[width=.5\textwidth]{img/insertionOnlyGplusSpace.png}}}\newline
+  \subfloat[\texttt{gplus\_large} - Time Taken]{{\includegraphics[width=.5\textwidth]{img/insertionOnlyGplusLargeTime.png}}}
+	\subfloat[\texttt{gplus\_large} - Space Used]{{\includegraphics[width=.5\textwidth]{img/insertionOnlyGplusLargeSpace.png}}}
+	\caption{Time taken and space used by different implementations of the proposed algorithm for insertion-only streams.}
 	%"Final Evaluation - insertion-only"/Master
 \end{figure}
 
@@ -611,7 +673,7 @@ To evaluate my final implementation I compared its performance to that of differ
 	}
 \end{algorithm}
 
-\textbf{Algorithm 5} uses three counters: sum of the weights $\phi=\sum\Delta$; sum of the weights weighted by their index $\iota=\sum i\cdot\Delta$; and, the sum of the weights weighted by the their index squared $\tau=\sum i^2\cdot\Delta$. \textbf{Lemma 3.1} proves that $\iota^2\equiv\phi\cdot\tau$ is a sufficient test for whether the described vector is exactly $1$-sparse. If the vector is exactly $1$-sparse then $\iota/\phi$ is the index of the non-zero element \& $\phi$ is its value. The only data stores are three counters each requiring $\mathcal{O}(\log n)$ space, thus \texttt{Perfect 1-Sparse Recovery} requires $\mathcal{O}(\log n)$ total space.
+\textbf{Algorithm 5} uses three counters: sum of the weights $\phi=\sum\Delta$; sum of the weights weighted by their index $\iota=\sum i\cdot\Delta$; and, the sum of the weights weighted by the their index squared $\tau=\sum i^2\cdot\Delta$. \textbf{Lemma 3.1} proves that $\iota^2\equiv\phi\cdot\tau$ is a sufficient test for whether the described vector is exactly $1$-sparse. If the vector is exactly $1$-sparse then $\iota/\phi$ is the index of the non-zero element and $\phi$ is its value. The only data stores are three counters each requiring $\mathcal{O}(\log n)$ space, thus \texttt{Perfect 1-Sparse Recovery} requires $\mathcal{O}(\log n)$ total space.
 
 \vspace{.3cm}\begin{adjustwidth}{.3cm}{}\fbox{\parbox{\textwidth}{
 
@@ -688,7 +750,7 @@ Once the updates have been exhausted the returned elements of the $1$-sparse rec
 			\lIf{$v\leq\frac{n^3}{2^k}$} {Pass update $(i,\Delta_i)$ to $S_y$}
 		}
 	}
-	$x\leftarrow\log_2(r)$\tcp*{$s$-Sparse recovery to recovery \& sample from}
+	$x\leftarrow\log_2(r)$\tcp*{$s$-Sparse recovery to recovery and sample from}
 	$a\leftarrow$returned from $S_x$\tcp*{Set of returned non-zero indices}
 	\If{$|a|\in[1,s]$}{
 		\Return{Index in $a$ with lowest hash value}
@@ -756,7 +818,7 @@ In \cite{orig} two single-pass algorithms are proposed for \texttt{neighbourhood
 \textbf{Lemma 3.2} For an unweighted insertion-deletion stream $\phi\equiv1$ and $\iota$ is the non-zero index \underline{iff} a vector is exactly $1$-sparse.\\
 
 % TODO a proof by contradiction
-\textit{Proof} In an unweighted insertion-deletion streams $\Delta=-1$ for a deletion instruction and $\Delta=1$ for an insertion instruction. In the case where a vector is exactly 0-sparse (\ie is the zero vector) the result trivially fails since there is no non-zero index for $\iota$ to hold. Consider a vector $v$ with non-zero index $i$. If $v$ is exactly 1-sparse then $i$ must have been insert exactly one more time than it was deleted, and all other indexes must have had the same number of insertions and deletions. Since each deletion cancels out an insertion there is only one insertion left. This means $\phi=1$ and $\iota=1\cdoti=i$, the result holds.\\
+\textit{Proof} In an unweighted insertion-deletion streams $\Delta=-1$ for a deletion instruction and $\Delta=1$ for an insertion instruction. In the case where a vector is exactly 0-sparse (\textit{i.e.} is the zero vector) the result trivially fails since there is no non-zero index for $\iota$ to hold. Consider a vector $v$ with non-zero index $i$. If $v$ is exactly 1-sparse then $i$ must have been insert exactly one more time than it was deleted, and all other indexes must have had the same number of insertions and deletions. Since each deletion cancels out an insertion there is only one insertion left. This means $\phi=1$ and $\iota=1\cdot i=i$, the result holds.\\
 Suppose $v$ is exactly $s$-sparse with $s>1$. Then there exists $s-1$ other indices $j_1,\dots,j_{s-1}\neq i$ which are inserted exactly one more time than it is deleted. After letting the deletions cancel the insertions there are $s$ insertion instructions left, this means $\phi=s$ and the result does not hold. Thus the result holds \underline{iff} $v$ is exactly $1$-sparse.$\hfill\square$
 
 }}\end{adjustwidth}\vspace{.3cm}
@@ -837,7 +899,7 @@ When implementing \texttt{$L_0$ Sampling} the main problem is how to implement t
 %\par Running $L_0$ samplers in parallel requires space being allocated for them before the stream is passed. This means all the space used by the algorithm (except that used to check for a sufficient neighbourhood) is known before the algorithm is run. This allows for a lot of evaluation of the space efficiency of the algorithm before implementation. %TODO consider removing
 
 \begin{figure}[H]
-	\label{Figure 14}
+	\label{Figure 15}
 	\subfloat[Time Taken]{{\includegraphics[width=.5\textwidth]{img/facebookDeletionInitialTime.png}}}
 	\subfloat[Space Used]{{\includegraphics[width=.5\textwidth]{img/facebookDeletionInitialSpace.png}}}
 	\caption{Space Usage and time taken for initial implementation of vertex sampling, for graph \texttt{facebook\_deletion}, when varying approximation factor.}
@@ -857,7 +919,7 @@ When implementing \texttt{$L_0$ Sampling} the main problem is how to implement t
 \par \textbf{Lemma 3.3} tells us the minimum number of $L_0$ samplers required for us to expect a sufficient neighbourhood to a vertex to be found and by tuning the value of $p$ the number of samplers and achieved success rate can be optimised. When a vertex is sampled it is appropriate to assume it has at least degree $\frac{d}c$. The greater the actual degree of the vertex, the lower $p$ needs to be for $\frac{d}c$ neighbours to be returned as collisions are less likely. So tuning $p$ for vertices of degree close to $\frac{d}c$ is a good indicator of how vertices of greater degree will perform. Testing showed that setting $p=.9$ resulted in a sufficient neighbourhood being found $23\%$ of the time for a vertex of degree $\frac{11d}{10c}$ and $97\%$ of the time for a vertex of degree $\frac{12d}{10c}$. The implementation of $L_0$ samplers being used only successfully samples $90\%$ of the time, to account for this the expected number of samplers is multiplied by $\frac{1}{.9}$.
 
 \begin{figure}[H]
-	\label{Figure 15}
+	\label{Figure 16}
 	\subfloat[Time Taken]{{\includegraphics[width=.5\textwidth]{img/facebookDeletionSamplersPerVertexTime.png}}}
 	\subfloat[Space Used]{{\includegraphics[width=.5\textwidth]{img/facebookDeletionSamplersPerVertexSpace.png}}}
 	\caption{Time taken and space used when the number of $L_0$ samplers is optimised against the initial implementation, for graph \texttt{facebook\_deletion}, when varying approximation factor.}
@@ -934,12 +996,15 @@ $N\leftarrow\{\{\}\}\ \{\text{neighbourhoods}\}$\\
 \Return{FAIL\hfill\texttt{No sufficient neighbourhoods}}
 \end{algorithm}
 
+\par I will briefly discuss the na\"ive algorithm as it may be useful for future projects. \textbf{Algorithm 11} is very similar to the na\"ive implementaiton given for insertion-only streams \textbf{Algorithm 4} in that it records the neighbourhood for every vertex. However, it does not have the efficiency of terminating after find the first sufficient neighbourhood as it is possible for that neighbourhood to shrink later in the stream. This method will see no significant variation in performance when $c$ is varied as it will produce the same set of neighbourhoods in every case. This method uses $\mathcal{O}(n^2)$ space for all values of $c$.
+
 \chapter{Conclusions}
 
 \section{Achievements}
 
 The algorithm proposed in \cite{orig} for insertion-only graphs proves very practical for solving \texttt{neighbourhood detection} on real world graphs. The changes to the implementations made reduced the time and space used by the algorithm significantly, while not compromising on the success rate. The final evaluation shows that the proposed algorithm is much more space-efficient than a naïve approach. Even for close approximations of large streams the final implementation uses less than $6\%$ of the file size and for $c\geq5$ it uses $\leq1\%$. This space efficiency increases the maximum file size at which the algorithm is usable, without requiring virtual memory. The run-times of my final implementation are very usable with solutions being found for a graph of over 30 million edges in a couple of minutes for close approximations $c\in[2,4]$.
-\par Due to difficulties in generating functions from a $k$-wise independent hashing family the proposed algorithm for insertion-deletion graphs could not be evaluated on graphs which were sufficiently large as to be interesting. However, I still managed to discuss several improvements to the implementation. The simplification of \texttt{1-sparse recovery} to only require two counters is a great improvement as, when the hash function is discounted, the \texttt{1-sparse recoveries} account for the majority of the space used by the $L_0$ samplers and thus both proposed algorithms. The probabilistic approach taken to reduce the number of $L_0$ samplers run for each vertex significantly improved performance by reducing redundancy, without compromising success. The indexing method which mapped edges to unique values in $[0,\frac12n(n-1))$ was a really good improvement as it is the optimal indexing method for undirected graphs. Although, the introduction of a mathematical hashing function rather than a look up table would negate this improvement.
+\par My main contribution to the proposed insertion-deletion algorithm is the demonstration of how limiting a poor implementation of $k$-wise independent hash family is to the practicalities of this algorithm. Research into possible implementations of these hashing families would consistute a significant and useful future project.
+\par Due to the difficulties in generating functions from a $k$-wise independent hashing family the proposed algorithm for insertion-deletion graphs could not be evaluated on graphs which were sufficiently large as to be interesting. However, I still managed to discuss several improvements to the implementation. The simplification of \texttt{1-sparse recovery} to only require two counters is a great improvement as, when the hash function is discounted, the \texttt{1-sparse recoveries} account for the majority of the space used by the $L_0$ samplers and thus both proposed algorithms. The probabilistic approach taken to reduce the number of $L_0$ samplers run for each vertex significantly improved performance by reducing redundancy, without compromising success. The indexing method which mapped edges to unique values in $\left[0,\frac12n(n-1)\right)$ was a really good improvement as it is the optimal indexing method for undirected graphs.
 
 \section{Future Work}
 
@@ -960,10 +1025,16 @@ I tested changing the reservoir sample size used in \textbf{Algorithm 2} but no 
 
 \begin{thebibliography}{4}
 	\addcontentsline{toc}{chapter}{Bibliography}
-	\bibitem{orig} Christian Konrad \textit{Streaming Frequent Items with Timestamps and Detecting Large Neighborhoods in Graph Streams.} November 2019
+	\bibitem{orig} Christian Konrad \textit{Streaming Frequent Items with Timestamps and Detecting Large Neighborhoods in Graph Streams.} November 2019.
 	\bibitem{SNAP}http://snap.stanford.edu/data/
-	\bibitem{L0Framework} Graham Cormode, Donatella Firmani \textit{A Unifying Frameworkd for $\ell_0$-Sampling Algorithms.} September 2014
-  \bibitem{socialNetworkDistribution} Tushti Rastogi \textit{A power law approach to estimating fake social network accounts.} May 2016
+	\bibitem{L0Framework} Graham Cormode, Donatella Firmani \textit{A Unifying Frameworkd for $\ell_0$-Sampling Algorithms.} September 2014.
+  \bibitem{socialNetworkDistribution} Tushti Rastogi \textit{A power law approach to estimating fake social network accounts.} May 2016.
+  \bibitem{GraphStreamSurvey} Andrew McGregor \textit{Graph Stream Algorithms: A Survey.} May 2014.
+  \bibitem{clusteringCofficient} Madhav Jha, C. Seshadhri, and Ali Pinar \textit{A space-efficient streaming algorithm for estimating transitivity and triangle counts using the birthday paradox.} February 2015.
+  \bibitem{edgesOfSpanner} B\'ela Bollob\'as \textit{Extremal Graph Theory.} 1978
+  \bibitem{spanner} Surender Baswana \textit{Streaming Algorithm for Graph Spanners - Single Pass and Constant Processing Time per Edge.} April 2008.
+  \bibitem{RandomWalks} Atish Das Sarma, Sreenivas Gollapudi, and Rina Panigraphy \textit{Estimating PageRank on Graph Streams.} May 2011.
+  \bibitem{degResSampling} Jeffery Vitter \textit{Random Sampling with a Reservoir.} Match 1985.
 \end{thebibliography}
 
 \end{document}
