@@ -17,7 +17,7 @@ Natural (Found on snap.stanford.edu/data)
 | Graph Name              | Type               | # Edges    | # Vertices | Max Degree | File Size    |
 | ----------------------- | ------------------ | ---------: | ---------: | ---------: | -----------: |
 | facebook_small          | Insertion-Only     | 292        | 52         | 36         | 3 KB         |
-| facebook_small_deletion | Insertion-Deletion | 258        | 52         | 33         | 5 KB         |
+| facebook_small_deletion | Insertion-Deletion | 326        | 52         | 33         | 5 KB         |
 | facebook                | Insertion-Only     | 60,050     | 747        | 586        | 587 KB       |
 | facebook_deletion       | Insertion-Deletion | 66,643     | 747        | 522        | 846 KB       |
 | gplus                   | Insertion-Only     | 1,179,613  | 12,417     | 5,948      | 52,839 KB    |

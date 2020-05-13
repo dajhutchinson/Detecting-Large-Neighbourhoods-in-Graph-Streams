@@ -69,7 +69,7 @@ int main() {
 
   // details of graph to perform on
   string file_path="../../../data/facebook_deletion.edges";
-  vertex target=2290;
+  vertex target=0;
   int num_vertices=747;
 
   set<vertex> recovered_neighbourhood=s_sparse_recovery(file_path, target, num_vertices, s, delta);

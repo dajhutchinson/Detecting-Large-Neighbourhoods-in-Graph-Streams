@@ -94,10 +94,10 @@ int main() {
   //execute_test(2,20,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
 
   // details of graph to perform on
-  edge_file_path="../../data/facebook_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices";
-  out_file="no_tau_test.csv";
-  num_vertices=747; d=267; reps=200;
-  execute_test(10,100,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
+  //edge_file_path="../../data/facebook_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices";num_vertices=747; d=267; reps=2;
+  edge_file_path="../../data/gplus.edges"; vertex_file_path="../../data/gplus.vertices";num_vertices=12417; d=5948; reps=10;
+  out_file="gplus_insertion_with_idv_algorithm.csv";
+  execute_test(5,20,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
 
   /*set<vertex> neighbourhood; vertex root; // variables for returned values
   int c=10;
@@ -110,13 +110,13 @@ int main() {
 
 void execute_test(int c_min, int c_max, int c_step, int reps, int d, int n, string edge_file_path, string vertex_file_path, string out_file) {
   ofstream outfile(out_file);
-  outfile<<"name,"<<vertex_file_path<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<"repetitions,"<<reps<<endl<<"delta,0.2"<<endl<<"gamma,0.3"<<endl<<"vertex sample size,log(n)"<<endl<<"L0 per vertex,ceil((1/success_rate)*log(1-.9)/log(1-((c-1)/(double)d)))"<<endl; // test details
-  outfile<<"c,time (microseconds), generating l0 hash time (microseconds) ,mean max space (bytes), l0 hash space (bytes), variance time, variance hash time, variance max space, variance hash space,successes"<<endl; // headers
+  outfile<<"name,"<<vertex_file_path<<endl<<"n,"<<n<<endl<<"d,"<<d<<endl<<"repetitions,"<<reps<<endl<<"delta,0.2"<<endl<<"gamma,0.3"<<endl<<"vertex sample size,1.2*(num_vertices/c)"<<endl<<"L0 per vertex,ceil((1/success_rate)*log(1-.9)/log(1-((c-1)/(double)d)))"<<endl; // test details
+  outfile<<"c,time (microseconds), generating l0 hash time (microseconds) ,mean max space (bytes), l0 hash space (bytes), variance time, variance max space,successes"<<endl; // headers
   set<vertex> neighbourhood; vertex root; // variables for returned values
   vector<uint64_t> times, total_space, hash_times, hash_space; // results of each run of c
   int successes;
-  for (int c=c_min;c<=c_max;c+=c_step) {
-  //for (int c=c_max;c>=c_min;c-=c_step) {
+  //for (int c=c_min;c<=c_max;c+=c_step) {
+  for (int c=c_max;c>=c_min;c-=c_step) {
     successes=0;
     times.clear(); total_space.clear(); hash_times.clear(); hash_space.clear();
     for (int i=0;i<reps;i++) {
@@ -169,9 +169,9 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
   double delta=0.2, gamma=0.3; // success_rate ~= P(L0 sampler returning a vertex given delta & gamma)
 
   // calculate model feature
-  //int vertex_sample_size=sqrt(num_vertices); // TODO play with
+  int vertex_sample_size=log(num_vertices); // TODO play with
   //int vertex_sample_size=(1>(d/pow(c,2))) ? sqrt(num_vertices) : sqrt(num_vertices)*(d/pow(c,2)); // TODO play with
-  int vertex_sample_size=(log(num_vertices)>((log(num_vertices)*d)/pow(c,4))) ? log(num_vertices) : ((log(num_vertices)*d)/pow(c,4));
+  //int vertex_sample_size=(log(num_vertices)>((log(num_vertices)*d)/pow(c,4))) ? log(num_vertices) : ((log(num_vertices)*d)/pow(c,4));
   //int samplers_per_l0=(d/c)*log(num_vertices); // TODO play with these
   double success_rate=0.85;
   int samplers_per_l0=ceil((1/success_rate)*log(1-.9)/log(1-((c-1)/(double)d)));
@@ -209,7 +209,7 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
   uint64_t** unique_hash_maps=(uint64_t**) malloc(total_samplers * sizeof(uint64_t*));
   uint64_t n3=pow(num_vertices,3);
   for (int i=0; i<total_samplers; i++) {
-    if (i%100==0) cout<<"\r"<<i;
+    if (i%10==0) cout<<"\r"<<i<<"/"<<total_samplers;
     uint64_t* hash_map=generate_random_hash(num_vertices,n3);
     unique_hash_maps[i]=hash_map;
   }

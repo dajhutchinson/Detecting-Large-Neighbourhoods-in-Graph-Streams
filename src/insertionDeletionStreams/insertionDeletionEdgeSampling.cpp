@@ -87,10 +87,11 @@ int main() {
   //execute_test(2,20,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
 
   // details of graph to perform on
-  //edge_file_path="../../data/facebook_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=747; d=267; reps=10;
-  edge_file_path="../../data/facebook_small_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=52; d=33; reps=10;
-  out_file="edge_sampled_better_id.csv";
-  execute_test(2,d,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
+  //edge_file_path="../../data/facebook_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=747; d=267; reps=1;
+  edge_file_path="../../data/facebook_small_deletion.edges"; vertex_file_path="../../data/facebook_deletion.vertices"; num_vertices=52; d=16; reps=10;
+  //out_file="facebook_deletion_edge_sampled_better_id.csv";
+  out_file="edge_sampled_better_id_2.csv";
+  execute_test(2,2,1,reps,d,num_vertices,edge_file_path,vertex_file_path,out_file);
 
   //set<vertex> neighbourhood; vertex root; // variables for returned values
   //int c=2;
@@ -185,7 +186,7 @@ void single_pass_insertion_deletion_stream(int c, int d, int num_vertices, strin
   uint64_t n3=pow(possible_edges,3);
   cout<<"possible_edges="<<possible_edges<<", n3="<<n3<<endl;
   for (int i=0; i<total_samplers; i++) {
-    if (i%10==0) cout<<"\r"<<i;
+    if (i%1==0) cout<<"\r"<<i;
     uint64_t* hash_map=generate_random_hash(possible_edges,n3);
     unique_hash_maps[i]=hash_map;
   }
